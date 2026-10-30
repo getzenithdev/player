@@ -1,0 +1,8 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="-10 -10 1020 1020" shape-rendering="geometricPrecision">
+  <g fill="#8b56a5" stroke="#8b56a5" stroke-width="6" stroke-linejoin="round" stroke-linecap="round">
+    <path d="M 28 427 A 300 300 0 1 1 572 427 A 385 385 0 0 0 28 427 Z" />
+    <path d="M 28 427 A 300 300 0 1 1 572 427 A 385 385 0 0 0 28 427 Z" transform="rotate(90 500 500)" />
+    <path d="M 28 427 A 300 300 0 1 1 572 427 A 385 385 0 0 0 28 427 Z" transform="rotate(180 500 500)" />
+    <path d="M 28 427 A 300 300 0 1 1 572 427 A 385 385 0 0 0 28 427 Z" transform="rotate(270 500 500)" />
+  </g>
+</svg>
