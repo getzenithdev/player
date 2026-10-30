@@ -114,6 +114,8 @@ Resolve physical locations according to operating system conventions. Portable m
 
 **Acceptance and testing:** the library, preferences, and playlists survive application shutdown and a computer restart. Simulate corrupted JSON, interrupted writes, a full disk, and insufficient permissions; verify recovery without overwriting the last valid copy.
 
+**Implementation notes:** `StorageManager` (Rust, `src-tauri/src/storage/`) provides the versioned schema, atomic writes, backups, recovery, export/import, cache cleanup, and in-memory indexes; it is covered by 25 unit tests, and the settings screen exposes the real storage status. The theme is the first persisted preference. Surviving a restart and a computer restart, plus corrupted-file recovery on installed builds, still needs manual acceptance on each target platform, so this phase is tracked as "En pruebas" rather than completed.
+
 ## Phase 3. Audio Engine
 
 **Objective:** provide stable offline playback of local music.
@@ -481,4 +483,4 @@ Minimum task template:
 - Blockers:
 ```
 
-No remote tasks have been created or deliverables marked as completed based on this roadmap.
+No remote tasks have been created, and no phase is marked as completed. The statuses shown in the development interface ("Base disponible", "En pruebas", "Vista previa") summarize implementation and automated coverage only; they do not replace the manual acceptance recorded for each phase.

@@ -14,7 +14,7 @@ export interface Phase {
   name: string;
   objective: string;
   view: View;
-  status: "Base disponible" | "Vista previa" | "Pendiente";
+  status: "Base disponible" | "En pruebas" | "Vista previa" | "Pendiente";
   checks: string[];
 }
 
@@ -38,11 +38,12 @@ export const phases: Phase[] = [
     objective:
       "Conservar datos y preferencias en archivos locales, sin bases de datos.",
     view: "settings",
-    status: "Pendiente",
+    status: "En pruebas",
     checks: [
       "Guardar una preferencia y recuperarla tras reiniciar.",
       "Recuperar un JSON dañado desde un respaldo válido.",
       "Importar y exportar datos sin incluir credenciales.",
+      "Verificar la ruta de almacenamiento y el modo portátil.",
     ],
   },
   {

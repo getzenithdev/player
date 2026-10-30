@@ -1,7 +1,19 @@
-import { useState, type ReactNode, type KeyboardEvent } from "react";
+import { useState, useEffect, type ReactNode, type KeyboardEvent } from "react";
 import { pickAudioFiles, useAudioEngine, type RepeatMode } from "./audio";
 import { Icon } from "./Icon";
 import { phases, type Phase, type View } from "./phases";
+import {
+  createBackup,
+  clearCache,
+  exportData,
+  formatBytes,
+  hasNativeStorage,
+  importData,
+  loadAppearance,
+  loadStorageStatus,
+  saveAppearance,
+  type StorageStatus,
+} from "./storage";
 import "./App.css";
 
 const navigation: { view: View; label: string }[] = [
@@ -82,6 +94,20 @@ function statusLabel(status: string) {
   if (status === "stopped") return "Detenido";
   if (status === "error") return "Error";
   return "";
+}
+
+function countLabel(count: number, singular: string, plural: string) {
+  return `${count} ${count === 1 ? singular : plural}`;
+}
+
+function storageSummary(status: StorageStatus) {
+  const stored = status.documents.filter((document) => document.exists).length;
+  const valid = status.documents.filter((document) => document.valid).length;
+  const backups = status.documents.reduce(
+    (sum, document) => sum + document.backups,
+    0,
+  );
+  return `${valid} de ${stored} documentos válidos · ${countLabel(backups, "respaldo", "respaldos")}`;
 }
 
 function navigateTabs(event: KeyboardEvent<HTMLButtonElement>) {
@@ -180,7 +206,14 @@ export default function App() {
   const [pickingFiles, setPickingFiles] = useState(false);
   const [seekValue, setSeekValue] = useState(0);
   const [seeking, setSeeking] = useState(false);
+  const [storageStatus, setStorageStatus] = useState<StorageStatus | null>(
+    null,
+  );
+  const [storageNotice, setStorageNotice] = useState<string | null>(null);
+  const [storageError, setStorageError] = useState<string | null>(null);
+  const [storageBusy, setStorageBusy] = useState(false);
   const audio = useAudioEngine();
+  const storageAvailable = hasNativeStorage();
   const playback = audio.state;
   const track = playback.track;
   const hasQueue = playback.queue.length > 0;
@@ -192,6 +225,56 @@ export default function App() {
   const seekMax = Math.max(playback.durationMs ?? 0, 1);
   const phase = phases.find((item) => item.id === selectedPhase)!;
   const title = navigation.find((item) => item.view === view)!.label;
+
+  useEffect(() => {
+    if (!storageAvailable) return;
+    let disposed = false;
+
+    void (async () => {
+      try {
+        const [status, appearance] = await Promise.all([
+          loadStorageStatus(),
+          loadAppearance(),
+        ]);
+        if (disposed) return;
+        setStorageStatus(status);
+        if (appearance) setTheme(appearance.theme);
+      } catch (reason) {
+        if (!disposed) setStorageError(String(reason));
+      }
+    })();
+
+    return () => {
+      disposed = true;
+    };
+  }, [storageAvailable]);
+
+  function changeTheme(next: string) {
+    setTheme(next);
+    if (!storageAvailable) return;
+
+    void saveAppearance(next).then(
+      (saved) => {
+        if (!saved) setStorageError("No se pudo guardar el tema.");
+      },
+      (reason) => setStorageError(String(reason)),
+    );
+  }
+
+  async function runStorageAction(action: () => Promise<string>) {
+    setStorageBusy(true);
+    setStorageError(null);
+    setStorageNotice(null);
+
+    try {
+      setStorageNotice(await action());
+      setStorageStatus(await loadStorageStatus());
+    } catch (reason) {
+      setStorageError(String(reason));
+    } finally {
+      setStorageBusy(false);
+    }
+  }
 
   async function openAudioFiles(play = true) {
     if (!audio.available) return;
@@ -768,12 +851,16 @@ export default function App() {
                 <>
                   <SettingRow
                     title="Tema"
-                    description="Vista previa en esta sesión. Se restablece al volver a abrir."
+                    description={
+                      storageAvailable
+                        ? "Se guarda en la aplicación de escritorio y se recupera al volver a abrir."
+                        : "Vista previa en esta sesión. La vista de navegador no guarda preferencias."
+                    }
                   >
                     <select
                       aria-label="Tema de la interfaz"
                       value={theme}
-                      onChange={(event) => setTheme(event.target.value)}
+                      onChange={(event) => changeTheme(event.target.value)}
                     >
                       <option value="light">Claro</option>
                       <option value="dark">Oscuro</option>
@@ -794,28 +881,141 @@ export default function App() {
                 <>
                   <SettingRow
                     title="Datos locales"
-                    description="Configuración, biblioteca, listas y preferencias en archivos JSON."
+                    description={
+                      storageStatus
+                        ? `Raíz: ${storageStatus.root}. ${storageSummary(storageStatus)}.`
+                        : "Configuración, biblioteca, listas y preferencias en archivos JSON."
+                    }
                   >
-                    <span className="status">Fase 2 pendiente</span>
+                    <span className="status">
+                      {storageStatus
+                        ? storageStatus.writable
+                          ? "Disponible"
+                          : "Solo lectura"
+                        : storageAvailable
+                          ? "Cargando"
+                          : "Vista de navegador"}
+                    </span>
+                  </SettingRow>
+                  <SettingRow
+                    title="Modo portátil"
+                    description="Carpeta junto al ejecutable, activada con el archivo marcador zenith-portable."
+                  >
+                    <span className="status">
+                      {storageStatus?.portable ? "Activado" : "Desactivado"}
+                    </span>
                   </SettingRow>
                   <SettingRow
                     title="Respaldos y recuperación"
-                    description="Protección frente a archivos dañados y escrituras interrumpidas."
+                    description="Copia de todos los documentos antes de un cambio importante; un JSON dañado se restaura desde su respaldo."
                   >
-                    <PendingButton phase={2}>Crear respaldo</PendingButton>
+                    <button
+                      className="button"
+                      disabled={!storageAvailable || storageBusy}
+                      onClick={() =>
+                        void runStorageAction(async () => {
+                          const report = await createBackup();
+                          return `Respaldo creado: ${countLabel(report.created.length, "documento", "documentos")} en ${report.directory}.`;
+                        })
+                      }
+                    >
+                      Crear respaldo
+                    </button>
+                  </SettingRow>
+                  <SettingRow
+                    title="Exportar datos"
+                    description="Configuración, biblioteca y letras en un archivo JSON, sin credenciales."
+                  >
+                    <button
+                      className="button"
+                      disabled={!storageAvailable || storageBusy}
+                      onClick={() =>
+                        void runStorageAction(async () => {
+                          const report = await exportData();
+                          return `Exportados ${report.config} de configuración y ${report.library} de biblioteca a ${report.path}.`;
+                        })
+                      }
+                    >
+                      Exportar
+                    </button>
+                  </SettingRow>
+                  <SettingRow
+                    title="Importar datos"
+                    description="Restaura el paquete exportado más reciente; las credenciales locales no se modifican."
+                  >
+                    <button
+                      className="button"
+                      disabled={!storageAvailable || storageBusy}
+                      onClick={() =>
+                        void runStorageAction(async () => {
+                          const report = await importData();
+                          return `Importado desde ${report.path}: ${report.config} de configuración y ${report.library} de biblioteca.`;
+                        })
+                      }
+                    >
+                      Importar
+                    </button>
                   </SettingRow>
                   <SettingRow
                     title="Caché"
-                    description="Límites, limpieza y ubicación de los recursos guardados."
+                    description={
+                      storageStatus
+                        ? `Recursos temporales: ${formatBytes(storageStatus.cache_bytes)}.`
+                        : "Límites, limpieza y ubicación de los recursos guardados."
+                    }
                   >
-                    <PendingButton phase={13}>Administrar</PendingButton>
+                    <button
+                      className="button"
+                      disabled={!storageAvailable || storageBusy}
+                      onClick={() =>
+                        void runStorageAction(async () => {
+                          const report = await clearCache();
+                          return `Caché liberada: ${formatBytes(report.freed_bytes)} en ${countLabel(report.removed_files, "archivo", "archivos")}.`;
+                        })
+                      }
+                    >
+                      Limpiar caché
+                    </button>
                   </SettingRow>
                   <SettingRow
-                    title="Importar y exportar"
-                    description="Transferir datos sin incluir credenciales."
+                    title="Índices en memoria"
+                    description={
+                      storageStatus
+                        ? `Búsqueda por ${storageStatus.index.fields.join(", ")}.`
+                        : "Búsqueda por título, artista, álbum, género, año, duración y ruta."
+                    }
                   >
-                    <PendingButton phase={2}>Exportar</PendingButton>
+                    <span className="status">
+                      {storageStatus
+                        ? countLabel(
+                            storageStatus.index.tracks,
+                            "pista",
+                            "pistas",
+                          )
+                        : "Sin datos"}
+                    </span>
                   </SettingRow>
+                  {storageNotice && (
+                    <p className="inline-note">{storageNotice}</p>
+                  )}
+                  {storageError && (
+                    <p className="inline-note error-note">{storageError}</p>
+                  )}
+                  {!storageAvailable && (
+                    <p className="inline-note">
+                      La vista de navegador no escribe en disco: respaldos,
+                      exportación, importación y limpieza de caché están
+                      disponibles en la aplicación de escritorio.
+                    </p>
+                  )}
+                  {storageStatus?.recovery.map((notice) => (
+                    <p
+                      key={`${notice.file}-${notice.kind}`}
+                      className="inline-note"
+                    >
+                      {notice.message}
+                    </p>
+                  ))}
                 </>
               )}
               {settingsTab === "Sistema" && (
@@ -929,8 +1129,8 @@ export default function App() {
               )}
             </section>
             <p className="inline-note">
-              La persistencia de preferencias se implementará en las fases 2 y
-              13.
+              El tema se guarda en la aplicación de escritorio. El resto de
+              preferencias se conectará en la fase 13.
             </p>
           </>
         );

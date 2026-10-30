@@ -19,6 +19,8 @@ The brand icon is the only decorative element. Phase numbers represent the actua
 
 ## Scope and review
 
-Keep library, playlists, queue, lyrics, artwork, sources, equalizer, settings, and all 16 phase reviews reachable. Local playback from the phase 3 engine is available in the desktop application; the browser preview keeps the transport disabled. Imports, provider connections, persistence, native integrations, and updates remain visibly pending. Theme changes, navigation, equalizer preview, and manual checklist interactions work in memory only; they must not be presented as completed roadmap features.
+Keep library, playlists, queue, lyrics, artwork, sources, equalizer, settings, and all 16 phase reviews reachable. Local playback from the phase 3 engine is available in the desktop application; the browser preview keeps the transport disabled. Imports, provider connections, the remaining native integrations, and updates remain visibly pending. Navigation, equalizer preview, and manual checklist interactions work in memory only; they must not be presented as completed roadmap features.
+
+The theme is persisted through the storage layer in the desktop application and restored on startup; in the browser preview it stays session-only and the control says so. **Configuración → Almacenamiento** reports the real storage root, permissions, document and backup counts, cache size, index counters, and recovery notices, and can create backups, export/import data without credentials, and clear the cache. Outside the desktop runtime those actions are disabled and explain why.
 
 Manual review marks are session-only observations, not implementation status or automated test results. Avoid fabricated songs, providers, successful updates, and completion percentages. Verify navigation, keyboard use, small-window layouts, and the distinction between working previews and pending features.

@@ -1,11 +1,18 @@
 mod audio;
+mod commands;
+mod storage;
 
 use tauri::Manager;
 
 #[cfg_attr(mobile, tauri::mobile_entry_point)]
 pub fn run() {
+    // Storage preparation never fails: a broken location degrades the manager
+    // to read-only instead of blocking the application from starting.
+    let storage = storage::StorageManager::initialize();
+
     tauri::Builder::default()
         .plugin(tauri_plugin_dialog::init())
+        .manage(storage)
         .setup(|app| {
             // The audio worker opens the output device in the background so a
             // missing or busy device never blocks application startup.
@@ -13,6 +20,14 @@ pub fn run() {
             Ok(())
         })
         .invoke_handler(tauri::generate_handler![
+            commands::storage_status,
+            commands::appearance_get,
+            commands::appearance_save,
+            commands::storage_backup,
+            commands::storage_export,
+            commands::storage_import,
+            commands::storage_clear_cache,
+            commands::storage_search,
             audio::audio_get_state,
             audio::audio_open_files,
             audio::audio_play_index,
