@@ -1,4 +1,5 @@
 import { useState, type ReactNode, type KeyboardEvent } from "react";
+import { pickAudioFiles, useAudioEngine, type RepeatMode } from "./audio";
 import { Icon } from "./Icon";
 import { phases, type Phase, type View } from "./phases";
 import "./App.css";
@@ -45,6 +46,43 @@ const settingsTabs = [
   "Actualizaciones",
   "Privacidad",
 ];
+const repeatModes: RepeatMode[] = ["off", "all", "one"];
+
+function formatTime(milliseconds: number | null) {
+  if (milliseconds === null || !Number.isFinite(milliseconds)) return "0:00";
+  const totalSeconds = Math.max(0, Math.floor(milliseconds / 1000));
+  const minutes = Math.floor(totalSeconds / 60);
+  const seconds = totalSeconds % 60;
+  return `${minutes}:${String(seconds).padStart(2, "0")}`;
+}
+
+function formatSampleRate(rate: number | null) {
+  if (!rate) return null;
+  const kilohertz = rate / 1000;
+  return `${Number.isInteger(kilohertz) ? kilohertz : kilohertz.toFixed(1)} kHz`;
+}
+
+function formatChannels(channels: number | null) {
+  if (!channels) return null;
+  if (channels === 1) return "mono";
+  if (channels === 2) return "estéreo";
+  return `${channels} canales`;
+}
+
+function repeatLabel(mode: RepeatMode) {
+  if (mode === "all") return "Repetir todo";
+  if (mode === "one") return "Repetir una";
+  return "Sin repetición";
+}
+
+function statusLabel(status: string) {
+  if (status === "loading") return "Cargando";
+  if (status === "playing") return "Reproduciendo";
+  if (status === "paused") return "En pausa";
+  if (status === "stopped") return "Detenido";
+  if (status === "error") return "Error";
+  return "";
+}
 
 function navigateTabs(event: KeyboardEvent<HTMLButtonElement>) {
   if (!["ArrowLeft", "ArrowRight", "Home", "End"].includes(event.key)) return;
@@ -139,8 +177,40 @@ export default function App() {
   const [nextPlaylistId, setNextPlaylistId] = useState(1);
   const [bands, setBands] = useState<number[]>(Array(10).fill(0));
   const [lyricsMode, setLyricsMode] = useState("Normal");
+  const [pickingFiles, setPickingFiles] = useState(false);
+  const [seekValue, setSeekValue] = useState(0);
+  const [seeking, setSeeking] = useState(false);
+  const audio = useAudioEngine();
+  const playback = audio.state;
+  const track = playback.track;
+  const hasQueue = playback.queue.length > 0;
+  const isPlaying = playback.status === "playing";
+  const canSeek =
+    playback.durationMs !== null &&
+    playback.durationMs > 0 &&
+    (playback.status === "playing" || playback.status === "paused");
+  const seekMax = Math.max(playback.durationMs ?? 0, 1);
   const phase = phases.find((item) => item.id === selectedPhase)!;
   const title = navigation.find((item) => item.view === view)!.label;
+
+  async function openAudioFiles(play = true) {
+    if (!audio.available) return;
+
+    try {
+      setPickingFiles(true);
+      const paths = await pickAudioFiles();
+      if (paths.length) await audio.openFiles(paths, play);
+    } catch (reason) {
+      audio.reportError(reason);
+    } finally {
+      setPickingFiles(false);
+    }
+  }
+
+  function cycleRepeat() {
+    const index = repeatModes.indexOf(playback.repeat);
+    audio.setRepeat(repeatModes[(index + 1) % repeatModes.length]);
+  }
 
   function openPhase(id: number) {
     setSelectedPhase(id);
@@ -333,26 +403,140 @@ export default function App() {
             )}
           </>
         );
-      case "queue":
+      case "queue": {
+        const totalDuration = playback.queue.reduce(
+          (sum, item) => sum + (item.durationMs ?? 0),
+          0,
+        );
         return (
           <>
             <div className="toolbar">
-              <p className="page-description">0 canciones en la cola</p>
+              <p className="page-description">
+                {hasQueue
+                  ? `${playback.queue.length} ${
+                      playback.queue.length === 1 ? "canción" : "canciones"
+                    } · ${formatTime(totalDuration)}`
+                  : "0 canciones en la cola"}
+              </p>
               <div className="button-group">
-                <PendingButton phase={5}>Guardar cola</PendingButton>
-                <PendingButton phase={5}>Limpiar</PendingButton>
+                <button
+                  className="button primary"
+                  disabled={!audio.available || pickingFiles}
+                  onClick={() => void openAudioFiles(true)}
+                >
+                  {pickingFiles ? "Abriendo…" : "Abrir archivos"}
+                </button>
+                <button
+                  className="button"
+                  disabled={!audio.available || !hasQueue}
+                  onClick={() => void audio.clearQueue()}
+                >
+                  Vaciar
+                </button>
               </div>
             </div>
-            <EmptyState icon="queue" title="No hay canciones en espera">
-              Aquí podrás reordenar la reproducción, agregar la siguiente
-              canción y restaurar tu última sesión.
-            </EmptyState>
-            <div className="module-note">
-              El motor de reproducción corresponde a la fase 3. La cola y su
-              restauración corresponden a la fase 5.
-            </div>
+            {hasQueue ? (
+              <>
+                <div className="toolbar queue-toolbar">
+                  <div className="button-group">
+                    <button
+                      className={`button ${playback.shuffle ? "active" : ""}`}
+                      aria-pressed={playback.shuffle}
+                      disabled={!audio.available}
+                      onClick={() => void audio.setShuffle(!playback.shuffle)}
+                    >
+                      <Icon name="shuffle" size={16} />
+                      Aleatorio
+                    </button>
+                    <button
+                      className="button"
+                      disabled={!audio.available}
+                      onClick={cycleRepeat}
+                    >
+                      <Icon
+                        name={
+                          playback.repeat === "one" ? "repeatOne" : "repeat"
+                        }
+                        size={16}
+                      />
+                      {repeatLabel(playback.repeat)}
+                    </button>
+                    <button
+                      className="button"
+                      disabled={!audio.available}
+                      onClick={() => void audio.restartOutput()}
+                    >
+                      Reiniciar salida
+                    </button>
+                  </div>
+                </div>
+                <ul className="plain-list queue-list">
+                  {playback.queue.map((item, index) => (
+                    <li
+                      key={`${item.path}-${index}`}
+                      className={
+                        playback.currentIndex === index ? "current" : ""
+                      }
+                    >
+                      <span className="queue-index">
+                        {playback.currentIndex === index ? (
+                          <Icon name="play" size={14} />
+                        ) : (
+                          String(index + 1).padStart(2, "0")
+                        )}
+                      </span>
+                      <button
+                        className="queue-track"
+                        disabled={!audio.available}
+                        onClick={() => void audio.playIndex(index)}
+                      >
+                        <strong>{item.title}</strong>
+                        <span className="secondary">
+                          {item.format} · {formatTime(item.durationMs)}
+                        </span>
+                      </button>
+                      {playback.currentIndex === index && (
+                        <span className="status">
+                          {statusLabel(playback.status)}
+                        </span>
+                      )}
+                    </li>
+                  ))}
+                </ul>
+                <div className="module-note">
+                  <span>
+                    {audio.capabilities
+                      ? `Motor: ${audio.capabilities.decoder} · salida ${audio.capabilities.output}.`
+                      : "Motor de audio local."}{" "}
+                    La cola es temporal; su persistencia llega en la fase 5.
+                  </span>
+                  <button className="text-button" onClick={() => openPhase(3)}>
+                    Ver comprobaciones
+                  </button>
+                </div>
+              </>
+            ) : (
+              <EmptyState icon="queue" title="No hay canciones en espera">
+                Abre archivos de audio para probar reproducción, pausa,
+                búsqueda, volumen y cambio de pista. La biblioteca y la cola
+                persistente llegan en las fases 4 y 5.
+              </EmptyState>
+            )}
+            {!audio.available && (
+              <p className="inline-note">
+                La reproducción requiere la aplicación de escritorio; la vista
+                de navegador no expone el motor de audio.
+              </p>
+            )}
+            {audio.error && (
+              <p className="inline-note error-note">{audio.error}</p>
+            )}
+            {playback.error && (
+              <p className="inline-note error-note">{playback.error}</p>
+            )}
           </>
         );
+      }
       case "lyrics":
         return (
           <>
@@ -637,6 +821,32 @@ export default function App() {
               {settingsTab === "Sistema" && (
                 <>
                   <SettingRow
+                    title="Motor de audio"
+                    description={
+                      audio.capabilities
+                        ? `${audio.capabilities.decoder} · salida ${audio.capabilities.output}.`
+                        : "Decodificación local y salida del sistema."
+                    }
+                  >
+                    <div className="button-group">
+                      <span className="status">
+                        {playback.outputSampleRate
+                          ? `${formatSampleRate(playback.outputSampleRate)} · ${
+                              formatChannels(playback.outputChannels) ??
+                              "salida"
+                            }`
+                          : "Sin salida"}
+                      </span>
+                      <button
+                        className="button"
+                        disabled={!audio.available}
+                        onClick={() => void audio.restartOutput()}
+                      >
+                        Reiniciar salida
+                      </button>
+                    </div>
+                  </SettingRow>
+                  <SettingRow
                     title="Controles multimedia"
                     description="Teclas del sistema, controles de reproducción y suspensión."
                   >
@@ -862,57 +1072,137 @@ export default function App() {
             <Icon name="music" />
           </div>
           <div>
-            <strong>Sin reproducción</strong>
-            <span>Agrega música cuando la biblioteca esté disponible</span>
+            <strong>{track?.title ?? "Sin reproducción"}</strong>
+            <span>
+              {track
+                ? [
+                    track.format,
+                    formatSampleRate(playback.sampleRate),
+                    formatChannels(playback.channels),
+                  ]
+                    .filter(Boolean)
+                    .join(" · ")
+                : audio.available
+                  ? "Abre archivos de audio para comenzar"
+                  : "El motor de audio se habilita en la aplicación de escritorio"}
+            </span>
           </div>
         </div>
         <div className="transport">
           <div className="transport-buttons">
             <button
               className="icon-button"
-              disabled
+              disabled={!audio.available || !hasQueue}
               aria-label="Canción anterior"
+              onClick={() => void audio.previous()}
             >
               <Icon name="previous" size={18} />
             </button>
             <button
               className="play-button"
-              disabled
-              aria-label="Reproducir: motor pendiente de la fase 3"
+              disabled={!audio.available}
+              aria-label={isPlaying ? "Pausar" : "Reproducir"}
+              onClick={() => {
+                if (!hasQueue) void openAudioFiles(true);
+                else void audio.toggle();
+              }}
             >
-              <Icon name="play" size={19} />
+              <Icon name={isPlaying ? "pause" : "play"} size={19} />
             </button>
             <button
               className="icon-button"
-              disabled
+              disabled={!audio.available || !hasQueue}
               aria-label="Canción siguiente"
+              onClick={() => void audio.next()}
             >
               <Icon name="next" size={18} />
             </button>
           </div>
           <div className="progress-row">
-            <span>0:00</span>
+            <span>{formatTime(playback.positionMs)}</span>
             <input
               type="range"
               aria-label="Posición de reproducción"
               min="0"
-              max="100"
-              value="0"
-              disabled
+              max={seekMax}
+              step="1"
+              value={Math.min(
+                seeking ? seekValue : playback.positionMs,
+                seekMax,
+              )}
+              disabled={!canSeek}
+              onChange={(event) => {
+                setSeeking(true);
+                setSeekValue(Number(event.target.value));
+              }}
+              onPointerDown={() => {
+                setSeeking(true);
+                setSeekValue(playback.positionMs);
+              }}
+              onPointerUp={(event) => {
+                setSeeking(false);
+                void audio.seek(Number(event.currentTarget.value));
+              }}
+              onPointerCancel={() => setSeeking(false)}
+              onKeyUp={(event) => {
+                setSeeking(false);
+                void audio.seek(Number(event.currentTarget.value));
+              }}
+              onBlur={(event) => {
+                if (seeking) {
+                  setSeeking(false);
+                  void audio.seek(Number(event.currentTarget.value));
+                }
+              }}
             />
-            <span>0:00</span>
+            <span>{formatTime(playback.durationMs)}</span>
           </div>
         </div>
         <div className="player-tools">
-          <Icon name="volume" size={18} />
+          <button
+            className="icon-button"
+            disabled={!audio.available}
+            aria-label={playback.muted ? "Activar sonido" : "Silenciar"}
+            title={playback.muted ? "Activar sonido" : "Silenciar"}
+            onClick={() => void audio.setMuted(!playback.muted)}
+          >
+            <Icon name={playback.muted ? "volumeOff" : "volume"} size={18} />
+          </button>
           <input
             type="range"
-            aria-label="Volumen: motor de audio pendiente"
+            aria-label="Volumen"
             min="0"
             max="100"
-            value="70"
-            disabled
+            value={Math.round((playback.muted ? 0 : playback.volume) * 100)}
+            disabled={!audio.available}
+            onChange={(event) => {
+              const volume = Number(event.target.value) / 100;
+              if (playback.muted) void audio.setMuted(false);
+              void audio.setVolume(volume);
+            }}
           />
+          <button
+            className={`icon-button ${playback.shuffle ? "active" : ""}`}
+            aria-label="Aleatorio"
+            aria-pressed={playback.shuffle}
+            title="Aleatorio"
+            disabled={!audio.available}
+            onClick={() => void audio.setShuffle(!playback.shuffle)}
+          >
+            <Icon name="shuffle" size={18} />
+          </button>
+          <button
+            className={`icon-button ${playback.repeat !== "off" ? "active" : ""}`}
+            aria-label={`Repetir: ${repeatLabel(playback.repeat)}`}
+            title={`Repetir: ${repeatLabel(playback.repeat)}`}
+            disabled={!audio.available}
+            onClick={cycleRepeat}
+          >
+            <Icon
+              name={playback.repeat === "one" ? "repeatOne" : "repeat"}
+              size={18}
+            />
+          </button>
           <button
             className={`icon-button ${view === "queue" ? "active" : ""}`}
             aria-label="Abrir cola"

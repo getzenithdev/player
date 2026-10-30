@@ -8,10 +8,12 @@
 - ESLint with TypeScript and React rules, Prettier, and Vitest.
 - Rust with Cargo, rustfmt, and Clippy, configured through `rust-toolchain.toml`.
 - Git for version control and GitHub Actions for CI.
+- Rodio 0.23 with Symphonia 0.5.5 for local decoding and CPAL 0.18 for audio output, as documented in [audio-engine.md](audio-engine.md).
+- The Tauri dialog plugin for selecting local audio files.
 
 JavaScript dependencies are installed locally in the repository. The Tauri CLI is a development dependency, so no global CLI installation is required. Commit `package-lock.json` and `src-tauri/Cargo.lock` to retain dependency resolution.
 
-No database, server, audio engine, or external provider dependency is included in this initial scaffold. Select those components in their roadmap phases.
+No database, server, or external provider dependency is required. The audio engine from phase 3 is local and works offline; library, lyrics, artwork, and provider integrations are selected in their roadmap phases.
 
 ## Native Prerequisites
 
@@ -37,8 +39,10 @@ Install Rust and the GTK/WebKit development packages required by Tauri. For Ubun
 
 ```sh
 sudo apt-get update
-sudo apt-get install -y libwebkit2gtk-4.1-dev build-essential curl wget file libxdo-dev libssl-dev libayatana-appindicator3-dev librsvg2-dev patchelf
+sudo apt-get install -y libwebkit2gtk-4.1-dev build-essential curl wget file libxdo-dev libssl-dev libayatana-appindicator3-dev librsvg2-dev patchelf pkg-config libasound2-dev
 ```
+
+CPAL uses ALSA on Linux, so the ALSA development headers (`libasound2-dev`) are required to compile the audio engine.
 
 Package names differ across distributions; consult the official prerequisites for Fedora and other environments.
 

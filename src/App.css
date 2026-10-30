@@ -275,6 +275,10 @@ input::placeholder {
   color: var(--muted);
 }
 .button {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
   border: 1px solid var(--line);
   background: var(--surface);
   color: var(--text);
@@ -286,6 +290,11 @@ input::placeholder {
 }
 .button:not(:disabled):hover {
   background: var(--hover);
+}
+.button.active {
+  background: var(--accent-soft);
+  border-color: var(--accent);
+  color: var(--accent);
 }
 .button.primary {
   background: #8b56a5;
@@ -448,6 +457,44 @@ input::placeholder {
   color: var(--muted);
   font-size: 12px;
   margin-top: 5px;
+}
+.queue-toolbar {
+  margin-top: -6px;
+}
+.queue-list {
+  margin-top: 0;
+}
+.queue-list li.current {
+  box-shadow: inset 3px 0 0 var(--accent);
+  padding-left: 12px;
+}
+.queue-list li.current strong {
+  color: var(--accent);
+}
+.queue-index {
+  width: 30px;
+  flex-shrink: 0;
+  text-align: center;
+  color: var(--muted);
+  font-size: 11px;
+  font-variant-numeric: tabular-nums;
+}
+.queue-track {
+  flex: 1;
+  min-width: 0;
+  padding: 0;
+  border: 0;
+  background: transparent;
+  text-align: left;
+}
+.queue-track:not(:disabled):hover strong {
+  color: var(--accent);
+}
+.error-note {
+  color: #9b2f3f;
+}
+.workspace[data-theme="dark"] .error-note {
+  color: #f0a0a0;
 }
 .lyrics-preview {
   min-height: 300px;

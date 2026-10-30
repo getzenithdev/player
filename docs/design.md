@@ -19,6 +19,6 @@ The brand icon is the only decorative element. Phase numbers represent the actua
 
 ## Scope and review
 
-Keep library, playlists, queue, lyrics, artwork, sources, equalizer, settings, and all 16 phase reviews reachable. Playback, imports, provider connections, persistence, native integrations, and updates remain visibly pending. Theme changes, navigation, equalizer preview, and manual checklist interactions work in memory only; they must not be presented as completed roadmap features.
+Keep library, playlists, queue, lyrics, artwork, sources, equalizer, settings, and all 16 phase reviews reachable. Local playback from the phase 3 engine is available in the desktop application; the browser preview keeps the transport disabled. Imports, provider connections, persistence, native integrations, and updates remain visibly pending. Theme changes, navigation, equalizer preview, and manual checklist interactions work in memory only; they must not be presented as completed roadmap features.
 
 Manual review marks are session-only observations, not implementation status or automated test results. Avoid fabricated songs, providers, successful updates, and completion percentages. Verify navigation, keyboard use, small-window layouts, and the distinction between working previews and pending features.

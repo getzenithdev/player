@@ -142,6 +142,8 @@ Evaluate Kira, Symphonia, and CPAL, with Rodio as an alternative, distinguishing
 
 **Acceptance and testing:** play short and long files, different sample rates and bit depths, high-resolution audio, files with ID3 tags, embedded artwork, and damaged metadata. Verify seeking, pause/resume, and error recovery without blocking the interface.
 
+**Implementation notes:** the selected engine, exposed controls, format matrix, and manual verification steps are documented in [audio-engine.md](audio-engine.md). The base engine is available; playback verification with reference files and Opus support remain pending.
+
 ## Phase 4. Music Library and Local Files
 
 **Objective:** import, index, and organize music without implicitly modifying original files.

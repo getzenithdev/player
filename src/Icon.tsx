@@ -1,7 +1,18 @@
 import type { ReactNode } from "react";
 import type { View } from "./phases";
 
-type IconName = View | "play" | "previous" | "next" | "volume" | "music";
+type IconName =
+  | View
+  | "play"
+  | "pause"
+  | "previous"
+  | "next"
+  | "volume"
+  | "volumeOff"
+  | "repeat"
+  | "repeatOne"
+  | "shuffle"
+  | "music";
 
 export function Icon({ name, size = 20 }: { name: IconName; size?: number }) {
   const paths: Record<IconName, ReactNode> = {
@@ -57,6 +68,7 @@ export function Icon({ name, size = 20 }: { name: IconName; size?: number }) {
       </>
     ),
     play: <path d="m9 5 11 7-11 7z" />,
+    pause: <path d="M9 5v14M15 5v14" />,
     previous: (
       <>
         <path d="M5 5v14m13-14L7 12l11 7z" />
@@ -70,6 +82,26 @@ export function Icon({ name, size = 20 }: { name: IconName; size?: number }) {
     volume: (
       <>
         <path d="M4 9h4l4-4v14l-4-4H4zM16 8a6 6 0 0 1 0 8m3-11a10 10 0 0 1 0 14" />
+      </>
+    ),
+    volumeOff: (
+      <>
+        <path d="M4 9h4l4-4v14l-4-4H4zM16 9l5 6M21 9l-5 6" />
+      </>
+    ),
+    repeat: (
+      <>
+        <path d="M17 2l4 4-4 4M3 11V9a4 4 0 0 1 4-4h14M7 22l-4-4 4-4M21 13v2a4 4 0 0 1-4 4H3" />
+      </>
+    ),
+    repeatOne: (
+      <>
+        <path d="M17 2l4 4-4 4M3 11V9a4 4 0 0 1 4-4h14M7 22l-4-4 4-4M21 13v2a4 4 0 0 1-4 4H3M11 10h1v4" />
+      </>
+    ),
+    shuffle: (
+      <>
+        <path d="M16 3h5v5M4 20l17-17M21 16v5h-5M15 15l6 6M4 4l5 5" />
       </>
     ),
     music: (

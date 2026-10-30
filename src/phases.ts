@@ -50,11 +50,12 @@ export const phases: Phase[] = [
     name: "Motor de audio",
     objective: "Reproducir archivos locales de forma estable y sin conexión.",
     view: "queue",
-    status: "Pendiente",
+    status: "Base disponible",
     checks: [
-      "Reproducir, pausar, cambiar de pista y buscar una posición.",
-      "Verificar los formatos y archivos de referencia.",
-      "Recuperar la reproducción tras suspensión o cambio de salida.",
+      "Reproducir, pausar, detener, cambiar de pista y buscar una posición.",
+      "Ajustar volumen, silencio, repetición y aleatorio.",
+      "Verificar MP3, FLAC, WAV, OGG, AIFF, AAC/ALAC y M4A con archivos de referencia.",
+      "Reiniciar la salida tras suspensión o cambio de dispositivo.",
     ],
   },
   {
