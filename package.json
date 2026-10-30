@@ -1,0 +1,48 @@
+{
+  "name": "zenith-player",
+  "private": true,
+  "version": "0.1.0",
+  "type": "module",
+  "scripts": {
+    "dev": "vite",
+    "build": "tsc && vite build",
+    "preview": "vite preview",
+    "tauri": "tauri",
+    "typecheck": "tsc --noEmit && tsc --project tsconfig.node.json --noEmit",
+    "test": "vitest run --passWithNoTests",
+    "format:check": "prettier --check .",
+    "rust:fmt": "cargo fmt --manifest-path src-tauri/Cargo.toml -- --check",
+    "rust:lint": "cargo clippy --locked --manifest-path src-tauri/Cargo.toml --all-targets -- -D warnings",
+    "lint": "eslint . --max-warnings 0",
+    "rust:test": "cargo test --locked --manifest-path src-tauri/Cargo.toml",
+    "rust:check": "cargo check --locked --manifest-path src-tauri/Cargo.toml",
+    "check": "npm run typecheck && npm run lint && npm run format:check && npm test",
+    "test:watch": "vitest",
+    "format": "prettier --write ."
+  },
+  "dependencies": {
+    "@tauri-apps/api": "^2",
+    "react": "^19.1.0",
+    "react-dom": "^19.1.0"
+  },
+  "devDependencies": {
+    "@eslint/js": "^10.0.1",
+    "@tauri-apps/cli": "^2",
+    "@types/node": "^24.19.2",
+    "@types/react": "^19.1.8",
+    "@types/react-dom": "^19.1.6",
+    "@vitejs/plugin-react": "^6.0.2",
+    "eslint": "^10.14.0",
+    "eslint-plugin-react-hooks": "^7.1.1",
+    "eslint-plugin-react-refresh": "^0.5.7",
+    "globals": "^17.13.0",
+    "prettier": "^3.9.10",
+    "typescript": "~6.0.3",
+    "typescript-eslint": "^8.72.1",
+    "vite": "^8.0.16",
+    "vitest": "^5.0.5"
+  },
+  "engines": {
+    "node": ">=24.0.0 <25"
+  }
+}
