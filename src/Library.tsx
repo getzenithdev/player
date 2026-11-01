@@ -6,6 +6,7 @@ import { pickAudioFiles, type AudioController } from "./audio";
 import {
   emptyLibrary,
   groupKey,
+  groupIdentity,
   libraryAction,
   libraryViews,
   selectTracks,
@@ -133,7 +134,7 @@ export function Library({ audio }: { audio: AudioController }) {
   const tracks = selectTracks(library, view, query);
   const groups = new Map<string, LibraryTrack[]>();
   for (const track of tracks) {
-    const key = groupKey(track, view);
+    const key = groupIdentity(track, view);
     const items = groups.get(key);
     if (items) items.push(track);
     else groups.set(key, [track]);
@@ -168,6 +169,31 @@ export function Library({ audio }: { audio: AudioController }) {
           Agregar carpetas
         </button>
         <button
+          disabled={!native || busy}
+          onClick={() =>
+            void (async () => {
+              setBusy(true);
+              setError(null);
+              try {
+                const path = await open({
+                  title: "Importar metadatos de biblioteca",
+                  multiple: false,
+                  directory: false,
+                  filters: [{ name: "Metadatos Zenith", extensions: ["json"] }],
+                });
+                if (typeof path === "string")
+                  await run({ kind: "importMetadata", path });
+              } catch (reason) {
+                setError(String(reason));
+              } finally {
+                setBusy(false);
+              }
+            })()
+          }
+        >
+          Importar metadatos JSON
+        </button>
+        <button
           disabled={!native || busy || !library.locations.length}
           onClick={() => void run({ kind: "rescan" })}
         >
@@ -196,6 +222,29 @@ export function Library({ audio }: { audio: AudioController }) {
           </ul>
         </details>
       )}
+      {library.metadata_analysis &&
+        (library.metadata_analysis.album_candidates.length > 0 ||
+          library.metadata_analysis.artist_collisions.length > 0) && (
+          <details className="library-warnings">
+            <summary>Coincidencias e identidades para revisar</summary>
+            <p>
+              Las entradas se conservan separadas. Una coincidencia de nombre no
+              confirma que sea la misma edición o el mismo artista.
+            </p>
+            <ul>
+              {library.metadata_analysis.album_candidates.map((a, i) => (
+                <li key={"album-" + i}>
+                  {a.name}: {a.album_keys.length} grupos de edición o identidad.
+                </li>
+              ))}
+              {library.metadata_analysis.artist_collisions.map((a, i) => (
+                <li key={"artist-" + i}>
+                  {a.name}: {a.identities.length} identidades de artista.
+                </li>
+              ))}
+            </ul>
+          </details>
+        )}
       <div className="tabs library-tabs" aria-label="Vistas de biblioteca">
         {libraryViews.map((tab) => (
           <button
@@ -231,25 +280,31 @@ export function Library({ audio }: { audio: AudioController }) {
         </div>
       )}
       {[...groups].map(([key, items]) => (
-        <section key={key} aria-label={key || view}>
-          {key && <h2 className="library-group">{key}</h2>}
+        <section key={key} aria-label={groupKey(items[0], view) || view}>
+          {groupKey(items[0], view) && (
+            <h2 className="library-group">{groupKey(items[0], view)}</h2>
+          )}
           <div className="library-tracks">
             {items.map((t) => (
               <article className="library-track" key={t.id}>
                 <Cover key={t.artwork_id} id={t.artwork_id} />
                 <button
                   className="library-track-title"
-                  disabled={t.missing}
+                  disabled={t.missing || !t.local_path}
                   onClick={() => play(t)}
                   title={t.local_path ?? undefined}
                 >
-                  <strong>{t.title}</strong>
+                  <strong>{t.title || "Sin título"}</strong>
                   <span>
                     {t.artist || "Artista desconocido"} ·{" "}
                     {t.album || "Sin álbum"}
                   </span>
                   <small>
-                    {t.missing ? "Archivo no disponible" : t.format}
+                    {!t.local_path
+                      ? "Sin archivo local"
+                      : t.missing
+                        ? "Archivo no disponible"
+                        : t.format}
                     {t.play_count > 0
                       ? ` · ${t.play_count} reproducciones`
                       : ""}
@@ -452,6 +507,29 @@ function MetadataEditor({
         }}
       >
         <h2 id="metadata-title">Editar metadatos</h2>
+        {track.metadata && (
+          <details className="metadata-provenance">
+            <summary>Origen, valores originales e identificadores</summary>
+            <p>
+              Fuente: {track.source || "Desconocida"}
+              {track.source_id ? ` · ${track.source_id}` : ""}
+            </p>
+            <pre>
+              {JSON.stringify(
+                {
+                  original: track.metadata.original,
+                  identifiers: track.metadata.identifiers,
+                  edition: track.metadata.edition,
+                  track_version: track.metadata.track_version,
+                  remixer: track.metadata.remixer,
+                },
+                null,
+                2,
+              )}
+            </pre>
+          </details>
+        )}
+
         {error && (
           <p role="alert" className="library-error">
             {error}

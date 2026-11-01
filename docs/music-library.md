@@ -24,7 +24,7 @@ Writing tags requires selecting **Escribir también las etiquetas en el archivo 
 
 ## Persistence and identity contract
 
-The existing version 1 `library/tracks.json` envelope now stores `data.tracks` and `data.locations`. Locations default to an empty array when loading older data. Each track retains the shared phase 2/6 fields plus album artist, comments, format, file size, modification timestamp, SHA-256, import date, availability, favorites, internal-edit flag, play count, and last-played time. Unknown metadata is `null`. Duration is whole seconds; timestamps are Unix seconds except `modified_ns`, an internal nanosecond cache key. Local IDs are randomly generated, independent of the path.
+The shared storage envelope (new writes v2, with v1 migration support) for `library/tracks.json` stores `data.tracks` and `data.locations`. Locations default to an empty array when loading older data. Each track retains the shared phase 2/6 fields plus album artist, comments, format, file size, modification timestamp, SHA-256, import date, availability, favorites, internal-edit flag, play count, and last-played time. Unknown metadata is `null`. Duration is whole seconds; timestamps are Unix seconds except `modified_ns`, an internal nanosecond cache key. Local IDs are randomly generated, independent of the path.
 
 All library commands, background reconciliation, history updates, and storage import/export share the storage operation lock. A mutation commits tracks, locations, metadata overlays, and user state in one atomic JSON document, with the existing backup/recovery mechanism, then rebuilds search indexes. Grouped albums/artists/genres are derived views and are not separately rewritten. Favorites and legacy phase 4 counters remain with their track. Phase 5 now stores playlists separately and session/history/cumulative listening data in `library/history.json`, overlaying its counters on library views. See [playlists-queue.md](playlists-queue.md).
 
@@ -65,6 +65,8 @@ Before calling the phase platform-accepted, run these manual checks on installed
 5. Edit metadata internally and compare original bytes. Explicitly write tags to a disposable copy, inspect readback and the exact backup, and repeat on read-only media.
 6. Verify embedded artwork, empty/error states, keyboard focus, dialog cancellation and light/dark themes. Test supported reference formats; WAV automated coverage alone is not a complete format matrix.
 7. Measure startup, scan duration and memory with an agreed reference library. The current implementation reads all candidate bytes once for initial hashes and rewrites the JSON on changes; a very large library requires performance measurement before any scalability claim.
+
+Phase 6 enriches each record with a universal metadata contract, preserved originals and source identifiers; see [metadata-engine.md](metadata-engine.md).
 
 ## Cambios para usuarios
 

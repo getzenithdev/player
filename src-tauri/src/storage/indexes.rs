@@ -77,6 +77,8 @@ pub struct TrackEntry {
     pub listened_ms: u64,
     #[serde(default)]
     pub last_position_ms: u64,
+    #[serde(default)]
+    pub metadata: crate::metadata::MetadataRecord,
 }
 
 /// Payload of `library/tracks.json`.
@@ -163,6 +165,40 @@ impl LibraryIndexes {
 
 fn track_matches(track: &TrackEntry, needle: &str) -> bool {
     contains(&track.title, needle)
+        || contains(track.album_artist.as_deref().unwrap_or_default(), needle)
+        || contains(track.source.as_deref().unwrap_or_default(), needle)
+        || contains(track.source_id.as_deref().unwrap_or_default(), needle)
+        || [
+            track
+                .metadata
+                .identifiers
+                .musicbrainz_recording_id
+                .as_deref(),
+            track.metadata.identifiers.musicbrainz_release_id.as_deref(),
+            track
+                .metadata
+                .identifiers
+                .musicbrainz_release_group_id
+                .as_deref(),
+            track.metadata.identifiers.musicbrainz_artist_id.as_deref(),
+            track
+                .metadata
+                .identifiers
+                .musicbrainz_album_artist_id
+                .as_deref(),
+            track.metadata.identifiers.isrc.as_deref(),
+        ]
+        .into_iter()
+        .flatten()
+        .any(|value| contains(value, needle))
+        || track
+            .metadata
+            .identifiers
+            .provider_track_ids
+            .values()
+            .chain(track.metadata.identifiers.provider_artist_ids.values())
+            .chain(track.metadata.identifiers.provider_album_ids.values())
+            .any(|value| contains(value, needle))
         || contains(track.artist.as_deref().unwrap_or_default(), needle)
         || contains(track.album.as_deref().unwrap_or_default(), needle)
         || contains(track.genre.as_deref().unwrap_or_default(), needle)
@@ -182,11 +218,7 @@ fn contains(haystack: &str, needle: &str) -> bool {
 /// Lowercases and collapses whitespace so small spelling differences do not
 /// create separate index buckets.
 fn normalize(value: &str) -> String {
-    value
-        .split_whitespace()
-        .collect::<Vec<&str>>()
-        .join(" ")
-        .to_lowercase()
+    crate::metadata::key(value)
 }
 
 fn push_text(map: &mut HashMap<String, Vec<usize>>, value: &str, position: usize) {

@@ -224,6 +224,8 @@ Duration is expressed in seconds. This example is not the final schema: document
 
 **Acceptance and testing:** distinguish versions with similar titles, preserve identities after restart, and handle incomplete metadata without losing entries.
 
+**Implementation notes:** phase 6 is implemented by the universal metadata contract v1, the v2 storage envelope with v1 migration, source-identity upserts, NFC/whitespace normalization with original values, local identifier extraction, and conservative recording/album/artist comparison. The library exposes adapter JSON import, identifier search, provenance inspection and ambiguity notices. See [metadata-engine.md](metadata-engine.md) for contract details, matching rules, regression coverage and pending installed-platform acceptance. The phase is tracked as "En pruebas".
+
 ## Phase 7. Lyrics Engine
 
 **Objective:** find, retain, and display synchronized or plain-text lyrics.

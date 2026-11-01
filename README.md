@@ -16,6 +16,10 @@ Playlists, queue sessions, listening history, and the theme persist in the deskt
 
 **Biblioteca** supports importing files or multiple folders, searching songs and metadata, grouped views, favorites, history, and playback. Locations are reconciled every ten seconds or on demand. Metadata edits stay internal unless the user explicitly requests writing tags to the original; explicit writes retain a recovery copy. See [Music Library and Local Files](docs/music-library.md) for identity rules, limitations, and desktop acceptance steps.
 
+## Universal Metadata
+
+Phase 6 adds normalized names with original-value preservation, source-neutral track identity, retained MusicBrainz/ISRC/provider IDs, edition/artist grouping, and conservative duplicate review. **Biblioteca → Importar metadatos JSON** ingests adapter snapshots, including records without local files; it does not connect external services. See [Metadata engine](docs/metadata-engine.md) for schema versions, migration, matching rules and validation.
+
 ## Playlists, Queue, and History
 
 **Listas** supports persistent playlist editing and M3U/M3U8/JSON interchange. **Cola** supports appending, play-next insertion, reordering, removal, an explicit saved copy, and automatic session restoration without autoplay. **Historial** records credited listening time and play counts, including files outside the library. See [Phase 5](docs/playlists-queue.md) for data contracts, counting rules, and installed-build acceptance.
@@ -24,7 +28,7 @@ Playlists, queue sessions, listening history, and the theme persist in the deskt
 
 Phase 2 stores every document as versioned JSON under a single per-platform root: `%APPDATA%\Zenith Player` on Windows, `~/Library/Application Support/Zenith Player` on macOS, and `$XDG_DATA_HOME` (or `~/.local/share`) on Linux. Portable mode is an explicit choice: placing a `zenith-portable` marker file next to the executable moves the root into a `Zenith Player` folder beside it.
 
-Each write goes to a temporary file that is flushed to disk and then replaced, so an interrupted write never destroys the previous copy. Documents are wrapped in a versioned envelope (`{"version":1,"updated_at":…,"data":…}`); a file written by a newer major version is preserved instead of being overwritten. A damaged document is moved to `logs/` and restored from the newest usable backup in `backups/` (the five newest per document), and the event is reported in **Configuración → Almacenamiento** and in `logs/storage.log`.
+Each write goes to a temporary file that is flushed to disk and then replaced, so an interrupted write never destroys the previous copy. New writes use the v2 envelope (`{"version":2,"updated_at":…,"data":…}`), with v1 read/migration support; a file written by a newer major version is preserved instead of being overwritten. A damaged document is moved to `logs/` and restored from the newest usable backup in `backups/` (the five newest per document), and the event is reported in **Configuración → Almacenamiento** and in `logs/storage.log`.
 
 **Configuración → Almacenamiento** shows the real storage root, write permissions, document and backup counts, cache size, and the in-memory index counters. It can create a manual backup, export and import the data bundle (configuration, library, and lyrics — never `config/providers.json`), and clear the cache without touching documents or music files. In the browser preview these actions stay disabled and explain that they require the desktop application.
 
@@ -70,5 +74,6 @@ GitHub Actions checks the frontend and compiles Windows x64, macOS Intel/Apple S
 - [Environment and commands](docs/environment.md)
 - [Audio engine](docs/audio-engine.md)
 - [Music library and local files](docs/music-library.md)
+- [Universal metadata and identity](docs/metadata-engine.md)
 - [Playlists, queue, and history](docs/playlists-queue.md)
 - [Development roadmap](docs/roadmap.md)

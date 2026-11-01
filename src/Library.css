@@ -171,3 +171,13 @@
   background: var(--accent-soft);
   border-color: var(--accent);
 }
+.metadata-provenance {
+  margin: 14px 0;
+}
+.metadata-provenance pre {
+  white-space: pre-wrap;
+  overflow-wrap: anywhere;
+  max-height: 220px;
+  overflow: auto;
+  font-size: 12px;
+}

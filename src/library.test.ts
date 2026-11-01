@@ -2,6 +2,9 @@ import { describe, expect, it } from "vitest";
 import {
   emptyLibrary,
   groupKey,
+  groupIdentity,
+  metadataKey,
+  type MetadataRecord,
   selectTracks,
   type LibraryTrack,
 } from "./library";
@@ -102,4 +105,59 @@ it("shows short listening visits in history without treating them as counted pla
   const library = { ...emptyLibrary, tracks: [t] };
   expect(selectTracks(library, "Historial", "")).toHaveLength(1);
   expect(selectTracks(library, "Más escuchadas", "")).toHaveLength(0);
+});
+
+describe("universal metadata presentation", () => {
+  const metadata = (artist_key: string, album_key: string): MetadataRecord => ({
+    version: 1,
+    original: null,
+    normalized: {
+      title: "song",
+      artist: "same",
+      album_artist: "same",
+      album: "album",
+      genre: "",
+    },
+    identifiers: {
+      musicbrainz_recording_id: "12345678-1234-1234-1234-123456789abc",
+      provider_track_ids: { apple_music: "apple-123" },
+    },
+    qualifiers: [],
+    artist_key,
+    album_key,
+    provider_data: {},
+  });
+  it("normalizes canonical Unicode and repeated whitespace for search", () => {
+    expect(metadataKey("  Cafe\u0301 \t LIVE ")).toBe("café live");
+    const library = {
+      ...emptyLibrary,
+      tracks: [track("one", { title: "Cafe\u0301 Live" })],
+    };
+    expect(selectTracks(library, "Canciones", " CAFÉ   LIVE ")).toHaveLength(1);
+  });
+  it("does not group same-name artists or albums with different stable keys", () => {
+    const a = track("a", { metadata: metadata("artist:one", "release:one") });
+    const b = track("b", { metadata: metadata("artist:two", "release:two") });
+    expect(groupIdentity(a, "Artistas")).not.toBe(groupIdentity(b, "Artistas"));
+    expect(groupIdentity(a, "Álbumes")).not.toBe(groupIdentity(b, "Álbumes"));
+    expect(groupKey(a, "Álbumes")).toBe(groupKey(b, "Álbumes"));
+  });
+  it("searches retained recording and provider identifiers without requiring a local file", () => {
+    const t = track("cloud", {
+      local_path: null,
+      source: "apple_music",
+      source_id: "source-item",
+      metadata: metadata("artist:one", "release:one"),
+    });
+    const library = { ...emptyLibrary, tracks: [t] };
+    expect(selectTracks(library, "Canciones", "apple-123")).toHaveLength(1);
+    expect(
+      selectTracks(
+        library,
+        "Canciones",
+        "12345678-1234-1234-1234-123456789abc",
+      ),
+    ).toHaveLength(1);
+    expect(selectTracks(library, "Canciones", "source-item")).toHaveLength(1);
+  });
 });

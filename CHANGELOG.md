@@ -1,6 +1,15 @@
 # Changelog
 
-## Unreleased — Phase 5
+## Unreleased — Phase 6
+
+- Add universal metadata v1 with retained original names, Unicode NFC/whitespace normalization and provider-neutral identities.
+- Upgrade storage writes to v2 with v1 migration/backups and downgrade protection.
+- Retain MusicBrainz/ISRC/Apple XID and namespaced provider identifiers, including provider-specific metadata.
+- Import metadata snapshots with stable source-identity refresh, preserving user state and records without local files.
+- Separate artist/release identities and report recording/album candidates without automatic merges.
+- Add identifier search, original/provenance inspection and migration/identity regression coverage.
+
+## Phase 5
 
 - Persist playlists with create, rename, duplicate, delete, add/remove and reorder operations, preserving duplicate song occurrences.
 - Import/export UTF-8 M3U, M3U8, and versioned Zenith JSON with local relative-path resolution and missing-file preservation.

@@ -57,6 +57,9 @@ pub enum LibraryAction {
         path: String,
     },
     Rescan,
+    ImportMetadata {
+        path: String,
+    },
     Edit {
         id: String,
         metadata: MetadataEdit,
@@ -72,6 +75,7 @@ pub enum LibraryAction {
 pub struct DuplicateGroup {
     pub ids: Vec<String>,
     pub confirmed: bool,
+    pub reason: String,
 }
 #[derive(Serialize)]
 pub struct LibrarySnapshot {
@@ -79,6 +83,7 @@ pub struct LibrarySnapshot {
     pub locations: Vec<String>,
     pub duplicates: Vec<DuplicateGroup>,
     pub warnings: Vec<String>,
+    pub metadata_analysis: crate::metadata::Analysis,
 }
 fn now() -> u64 {
     SystemTime::now()
@@ -87,10 +92,17 @@ fn now() -> u64 {
         .as_secs()
 }
 pub(crate) fn load(storage: &StorageManager) -> Result<TracksDocument, String> {
-    storage
+    let mut doc = storage
         .load_document::<TracksDocument>(DOCUMENT)
         .map(|doc| doc.map(|d| d.data).unwrap_or_default())
-        .map_err(|e| e.to_string())
+        .map_err(|e| e.to_string())?;
+    if crate::metadata::prepare_document(&mut doc)? {
+        storage
+            .save_document(DOCUMENT, &doc)
+            .map_err(|e| e.to_string())?;
+        storage.rebuild_indexes();
+    }
+    Ok(doc)
 }
 pub(crate) fn save(storage: &StorageManager, doc: &TracksDocument) -> Result<(), String> {
     storage
@@ -108,7 +120,7 @@ fn snapshot(
         warnings.push(error);
     }
     let mut hash_groups: HashMap<String, Vec<String>> = HashMap::new();
-    let mut candidates: HashMap<String, Vec<String>> = HashMap::new();
+    let mut candidates: HashMap<String, Vec<&TrackEntry>> = HashMap::new();
     for t in doc.tracks.iter().filter(|t| !t.missing) {
         if !t.hash.is_empty() {
             hash_groups
@@ -116,20 +128,17 @@ fn snapshot(
                 .or_default()
                 .push(t.id.clone());
         }
-        if t.artist.is_some() && t.duration.is_some() {
-            let key = format!(
-                "{}|{}|{}|{:?}|{}",
-                t.title.trim().to_lowercase(),
-                t.artist
-                    .as_deref()
-                    .unwrap_or_default()
-                    .trim()
-                    .to_lowercase(),
-                t.album.as_deref().unwrap_or_default().trim().to_lowercase(),
-                t.duration,
-                t.size
-            );
-            candidates.entry(key).or_default().push(t.id.clone());
+        let n = &t.metadata.normalized;
+        if !n.title.is_empty() && !n.artist.is_empty() && t.duration.is_some() {
+            let signature = serde_json::to_string(&(
+                &n.title,
+                &t.metadata.artist_key,
+                &t.metadata.qualifiers,
+                crate::metadata::key(t.metadata.track_version.as_deref().unwrap_or_default()),
+                crate::metadata::key(t.metadata.remixer.as_deref().unwrap_or_default()),
+            ))
+            .unwrap_or_default();
+            candidates.entry(signature).or_default().push(t);
         }
     }
     let mut duplicates: Vec<_> = hash_groups
@@ -138,24 +147,47 @@ fn snapshot(
         .map(|ids| DuplicateGroup {
             ids,
             confirmed: true,
+            reason: "Contenido completo idéntico (SHA-256)".into(),
         })
         .collect();
-    for ids in candidates.into_values().filter(|ids| ids.len() > 1) {
-        if !duplicates
-            .iter()
-            .any(|g| ids.iter().all(|id| g.ids.contains(id)))
-        {
-            duplicates.push(DuplicateGroup {
-                ids,
-                confirmed: false,
-            });
+    for mut group in candidates.into_values() {
+        group.sort_by_key(|t| t.duration);
+        let mut start = 0;
+        while start < group.len() {
+            let mut end = start + 1;
+            while end < group.len()
+                && matches!(
+                    crate::metadata::compare(group[start], group[end]).kind,
+                    crate::metadata::MatchKind::SharedRecording
+                        | crate::metadata::MatchKind::PossibleRecording
+                )
+            {
+                end += 1;
+            }
+            if end - start > 1 {
+                let ids: Vec<_> = group[start..end].iter().map(|t| t.id.clone()).collect();
+                if !duplicates
+                    .iter()
+                    .any(|g| ids.iter().all(|id| g.ids.contains(id)))
+                {
+                    duplicates.push(DuplicateGroup {
+                        ids,
+                        confirmed: false,
+                        reason: "Metadatos y duración compatibles; no se fusionaron entradas"
+                            .into(),
+                    });
+                }
+            }
+            start = end;
         }
     }
+    let metadata_analysis = crate::metadata::analyze(&doc.tracks);
     LibrarySnapshot {
         tracks: doc.tracks,
         locations: doc.locations,
         duplicates,
         warnings,
+        metadata_analysis,
     }
 }
 pub fn execute(storage: &StorageManager, action: LibraryAction) -> Result<LibrarySnapshot, String> {
@@ -189,6 +221,9 @@ pub fn execute(storage: &StorageManager, action: LibraryAction) -> Result<Librar
             });
         }
         LibraryAction::Rescan => reconcile(storage, &mut doc, &mut warnings),
+        LibraryAction::ImportMetadata { path } => {
+            crate::metadata::import_file(&mut doc, Path::new(&path))?
+        }
         LibraryAction::Favorite { id, favorite } => {
             let track = doc
                 .tracks
@@ -241,6 +276,7 @@ pub fn execute(storage: &StorageManager, action: LibraryAction) -> Result<Librar
             }
         }
     }
+    crate::metadata::prepare_document(&mut doc)?;
     if doc != before {
         save(storage, &doc)?;
     }
@@ -351,7 +387,13 @@ pub(crate) fn reconcile(
                 .iter()
                 .position(|t| t.local_path.as_deref() == Some(&text));
             if existing.is_some_and(|i| {
-                doc.tracks[i].size == stat.len() && doc.tracks[i].modified_ns == stamp(&stat)
+                doc.tracks[i].size == stat.len()
+                    && doc.tracks[i].modified_ns == stamp(&stat)
+                    && doc.tracks[i]
+                        .metadata
+                        .provider_data
+                        .get("local_tags_version")
+                        == Some(&serde_json::json!(1))
             }) {
                 return Ok(());
             }
@@ -384,6 +426,7 @@ pub(crate) fn reconcile(
             if let Some(i) = index {
                 let old = &doc.tracks[i];
                 fresh.id = old.id.clone();
+                crate::metadata::retain_identifiers(&mut fresh.metadata, &old.metadata);
                 fresh.added_at = old.added_at;
                 fresh.favorite = old.favorite;
                 fresh.last_played = old.last_played;
@@ -403,8 +446,10 @@ pub(crate) fn reconcile(
                     .apply(&mut fresh);
                     fresh.edited = true;
                 }
+                crate::metadata::prepare(&mut fresh)?;
                 doc.tracks[i] = fresh;
             } else {
+                crate::metadata::prepare(&mut fresh)?;
                 doc.tracks.push(fresh);
             }
             Ok(())
@@ -452,6 +497,44 @@ fn read_track(storage: &StorageManager, path: &Path) -> Result<TrackEntry, Strin
         t.disc_number = tag.disk();
         t.comments = tag.comment().map(|v| v.into_owned());
         t.album_artist = tag.get_string(ItemKey::AlbumArtist).map(str::to_owned);
+        t.metadata.identifiers = crate::metadata::ExternalIds {
+            musicbrainz_recording_id: tag
+                .get_string(ItemKey::MusicBrainzRecordingId)
+                .map(str::to_owned),
+            musicbrainz_release_id: tag
+                .get_string(ItemKey::MusicBrainzReleaseId)
+                .map(str::to_owned),
+            musicbrainz_release_group_id: tag
+                .get_string(ItemKey::MusicBrainzReleaseGroupId)
+                .map(str::to_owned),
+            musicbrainz_artist_id: tag
+                .get_string(ItemKey::MusicBrainzArtistId)
+                .map(str::to_owned),
+            musicbrainz_album_artist_id: tag
+                .get_string(ItemKey::MusicBrainzReleaseArtistId)
+                .map(str::to_owned),
+            isrc: tag.get_string(ItemKey::Isrc).map(str::to_owned),
+            ..Default::default()
+        };
+        if let Some(xid) = tag.get_string(ItemKey::AppleXid) {
+            t.metadata
+                .identifiers
+                .provider_track_ids
+                .insert("apple_xid".into(), xid.into());
+        }
+        t.metadata.track_version = tag.get_string(ItemKey::TrackSubtitle).map(str::to_owned);
+        t.metadata.remixer = tag.get_string(ItemKey::Remixer).map(str::to_owned);
+        for (name, key) in [
+            ("catalog_number", ItemKey::CatalogNumber),
+            ("release_country", ItemKey::ReleaseCountry),
+            ("release_type", ItemKey::MusicBrainzReleaseType),
+        ] {
+            if let Some(value) = tag.get_string(key) {
+                t.metadata
+                    .provider_data
+                    .insert(name.into(), serde_json::json!(value));
+            }
+        }
         if let Some(picture) = tag
             .pictures()
             .first()
@@ -475,6 +558,10 @@ fn read_track(storage: &StorageManager, path: &Path) -> Result<TrackEntry, Strin
             }
         }
     }
+    t.metadata
+        .provider_data
+        .insert("local_tags_version".into(), serde_json::json!(1));
+    crate::metadata::prepare(&mut t)?;
     Ok(t)
 }
 fn write_metadata(path: &Path, edit: &MetadataEdit) -> Result<(), String> {

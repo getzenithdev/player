@@ -3,6 +3,7 @@ mod audio_persistence;
 mod commands;
 mod library;
 mod library_commands;
+mod metadata;
 mod playlist_commands;
 mod playlists;
 mod session;
@@ -22,6 +23,12 @@ pub fn run() {
         .setup(|app| {
             // The audio worker opens the output device in the background so a
             // missing or busy device never blocks application startup.
+            if let Err(error) = library::execute(
+                &app.state::<storage::StorageManager>(),
+                library::LibraryAction::Snapshot,
+            ) {
+                eprintln!("No se pudieron preparar los metadatos: {error}");
+            }
             app.manage(audio::AudioEngine::new(app.handle().clone()));
             library_commands::start_monitor(app.handle().clone());
             Ok(())

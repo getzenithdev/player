@@ -8,7 +8,7 @@ Implementation status: available, **En pruebas** until installed-build acceptanc
 
 **Reproducir lista** copies its entries into an independent queue. Playing from a particular row starts that row followed by the remaining rows and then the preceding rows. Missing entries stay visible, and playback starts with the first available file. Changing the queue never changes the saved playlist. **Guardar como lista** in **Cola** creates another independent list from the current queue.
 
-The version 1 `library/playlists.json` envelope stores `data.playlists`. Entries retain a stable library track ID where available and a fallback local path, title, format, duration in milliseconds, and an availability hint. Paths/titles resolve against current library metadata on read; moving a library file therefore follows the library's stable identity. Removing a library location does not delete playlist entries or their files; an entry with an unavailable path remains visible.
+The shared storage envelope (new writes v2, with v1 read compatibility) for `library/playlists.json` stores `data.playlists`. Entries retain a stable library track ID where available and a fallback local path, title, format, duration in milliseconds, and an availability hint. Paths/titles resolve against current library metadata on read; moving a library file therefore follows the library's stable identity. Removing a library location does not delete playlist entries or their files; an entry with an unavailable path remains visible.
 
 ## Import and export
 

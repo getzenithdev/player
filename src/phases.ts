@@ -92,7 +92,7 @@ export const phases: Phase[] = [
     objective:
       "Identificar pistas de distintas fuentes sin confundir sus versiones.",
     view: "library",
-    status: "Pendiente",
+    status: "En pruebas",
     checks: [
       "Conservar la identidad interna al reiniciar o mover archivos.",
       "Distinguir versiones en vivo, remixes y artistas homónimos.",

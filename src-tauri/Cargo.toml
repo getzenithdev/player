@@ -25,6 +25,7 @@ rand = "0.9"
 lofty = "0.25.4"
 sha2 = "0.10"
 base64 = "0.22"
+unicode-normalization = "0.1"
 rodio = { version = "0.23", default-features = false, features = [
   "playback",
   "flac",
