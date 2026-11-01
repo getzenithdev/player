@@ -2,6 +2,8 @@ mod audio;
 mod commands;
 mod library;
 mod library_commands;
+mod playlist_commands;
+mod playlists;
 mod storage;
 
 use tauri::Manager;
@@ -25,6 +27,7 @@ pub fn run() {
         .invoke_handler(tauri::generate_handler![
             library_commands::library_action,
             library_commands::library_artwork,
+            playlist_commands::playlist_action,
             commands::storage_status,
             commands::appearance_get,
             commands::appearance_save,
