@@ -18,6 +18,9 @@ import "./App.css";
 import { Library } from "./Library";
 import { Playlists } from "./Playlists";
 import { QueuePanel } from "./QueuePanel";
+import { Artwork } from "./Artwork";
+import { TrackArtwork } from "./TrackArtwork";
+import { Lyrics } from "./Lyrics";
 import { ListeningHistory } from "./ListeningHistory";
 
 const navigation: { view: View; label: string }[] = [
@@ -172,7 +175,6 @@ export default function App() {
   const [selectedPhase, setSelectedPhase] = useState(2);
   const [reviewed, setReviewed] = useState<string[]>([]);
   const [bands, setBands] = useState<number[]>(Array(10).fill(0));
-  const [lyricsMode, setLyricsMode] = useState("Normal");
   const [pickingFiles, setPickingFiles] = useState(false);
   const [seekValue, setSeekValue] = useState(0);
   const [seeking, setSeeking] = useState(false);
@@ -310,99 +312,9 @@ export default function App() {
       case "history":
         return <ListeningHistory audio={audio} />;
       case "lyrics":
-        return (
-          <>
-            <div className="tabs" role="tablist" aria-label="Modo de letras">
-              {["Normal", "Karaoke", "Minimalista", "Pantalla completa"].map(
-                (mode) => (
-                  <button
-                    key={mode}
-                    role="tab"
-                    id={`lyrics-${mode.replace(/\s+/g, "-")}`}
-                    aria-controls="lyrics-content"
-                    aria-selected={lyricsMode === mode}
-                    tabIndex={lyricsMode === mode ? 0 : -1}
-                    onKeyDown={navigateTabs}
-                    onClick={() => setLyricsMode(mode)}
-                  >
-                    {mode}
-                  </button>
-                ),
-              )}
-            </div>
-            <section
-              id="lyrics-content"
-              role="tabpanel"
-              aria-labelledby={`lyrics-${lyricsMode.replace(/\s+/g, "-")}`}
-            >
-              <div className="lyrics-preview">
-                <Icon name="lyrics" size={30} />
-                <h2>
-                  {lyricsMode === "Normal"
-                    ? "Las letras aparecerán aquí"
-                    : `Vista de letras: ${lyricsMode.toLowerCase()}`}
-                </h2>
-                <p>Selecciona una canción cuando el motor esté conectado.</p>
-                <span className="status">Fase 7 pendiente</span>
-              </div>
-            </section>
-            <div className="toolbar bottom-tools">
-              <label className="control-label">
-                Desfase{" "}
-                <input
-                  aria-label="Desfase de letras en milisegundos"
-                  type="number"
-                  value="0"
-                  disabled
-                />{" "}
-                ms
-              </label>
-              <div className="button-group">
-                <PendingButton phase={7}>Buscar letras</PendingButton>
-                <PendingButton phase={7}>Abrir LRC</PendingButton>
-              </div>
-            </div>
-            <p className="inline-note">
-              El selector permite revisar la navegación. La sincronización,
-              animación y pantalla completa real aún no están implementadas.
-            </p>
-          </>
-        );
+        return <Lyrics audio={audio} />;
       case "artwork":
-        return (
-          <>
-            <p className="page-description">
-              Portadas estáticas y animadas, con una alternativa local.
-            </p>
-            <div className="artwork-layout">
-              <div className="artwork-placeholder">
-                <Icon name="artwork" size={54} />
-                <span>Sin portada</span>
-              </div>
-              <div>
-                <h2>Orden de búsqueda previsto</h2>
-                <ol className="provider-order">
-                  {[
-                    "Apple Music · animada",
-                    "Apple Music · estática",
-                    "Archive.org",
-                    "YouTube",
-                    "Portada local",
-                    "Imagen predeterminada",
-                  ].map((item) => (
-                    <li key={item}>{item}</li>
-                  ))}
-                </ol>
-                <PendingButton phase={8}>Buscar portada</PendingButton>
-              </div>
-            </div>
-            <div className="module-note">
-              Sin conexión se usarán recursos guardados y portadas locales. La
-              obtención y reproducción de recursos autorizados se implementará
-              en la fase 8.
-            </div>
-          </>
-        );
+        return <Artwork audio={audio} />;
       case "sources":
         return (
           <>
@@ -962,9 +874,11 @@ export default function App() {
       </main>
       <footer className="player-bar" aria-label="Reproductor">
         <div className="now-playing">
-          <div className="mini-artwork">
-            <Icon name="music" />
-          </div>
+          <TrackArtwork
+            className="mini-artwork"
+            trackId={track?.trackId}
+            path={track?.path}
+          />
           <div>
             <strong>{track?.title ?? "Sin reproducción"}</strong>
             <span>

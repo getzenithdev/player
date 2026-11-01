@@ -71,3 +71,13 @@ Phase 6 enriches each record with a universal metadata contract, preserved origi
 ## Cambios para usuarios
 
 La biblioteca ya permite agregar archivos o varias carpetas, buscar y explorar música, reproducirla, guardar favoritos y editar metadatos. Las ubicaciones se revisan automáticamente y los archivos ausentes se conservan para poder recuperarlos. Las posibles copias se muestran sin borrar ni fusionar música. Editar en Zenith no modifica el archivo original: la escritura de etiquetas es una opción explícita y deja una copia de recuperación junto al archivo.
+
+## Cross-platform CI correction (2026-11-01)
+
+The initial phase 4–6 CI passed on Linux but failed two path-related tests on macOS and Windows. Imported locations are canonical (`/private/var/...` on macOS; verbatim Windows paths), while callers may use an equivalent noncanonical path. Location removal now compares the same canonical identity used by import; a Unix symlink-alias regression test also verifies that removing a location retains its music. The play-count test helper also normalizes its lookup path.
+
+Windows additionally rejected flushing a staged tag rewrite through a read-only handle (`Access is denied`, OS error 5). The flush now opens the already-staged file with write access, as required by Windows, before replacement. The original and recovery-copy safeguards remain in place. Existing tag-write/read-back tests exercise this path on all runners.
+
+The Intel macOS CI job uses `macos-15-intel`, so Rust tests and desktop compilation actually run on Intel; `macos-15` is the ARM runner. No failing tests are skipped or weakened.
+
+En español: se corrige la identidad de rutas equivalentes al quitar ubicaciones y el permiso de escritura necesario para sincronizar etiquetas en Windows. Se prueba Intel en un runner Intel y se conservan todas las pruebas de regresión.

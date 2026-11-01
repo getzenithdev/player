@@ -1,5 +1,24 @@
 # Changelog
 
+## CI portability fixes
+
+- Normalize location-removal paths using the same canonical identity as import on macOS and Windows.
+- Flush staged metadata files through writable handles on Windows; preserve original/recovery-copy safeguards.
+- Run Intel macOS validation on the actual Intel runner instead of repeating ARM tests.
+
+## Unreleased — Phase 8
+
+- Add validated content-addressed artwork originals, previews, thumbnails and provenance with offline fallback and manual priority overrides.
+- Add local/embedded discovery, opt-in Archive.org search with license checks, and authorized Apple Music/YouTube manifest import.
+- Connect artwork to library, player and lyrics backgrounds; add bounded GIF animation with pause, looping, visibility, reduced-motion and battery controls.
+- Verify LyricsPlus v2 `syllabus` timing against its source and retain import compatibility with `syllables`.
+
+## Unreleased — Phase 7
+
+- Add offline lyrics storage, LRC/extended LRC/TXT and embedded-tag readers, LRCLIB search and LyricsPlus v2 snapshot import.
+- Add result ranking/rejection, local editing/export, per-song/global timing and four audio-position-driven display modes.
+- Add bounded provider requests, opt-in external queries and regression coverage; document the unavailable LyricsPlus live service.
+
 ## Unreleased — Phase 6
 
 - Add universal metadata v1 with retained original names, Unicode NFC/whitespace normalization and provider-neutral identities.

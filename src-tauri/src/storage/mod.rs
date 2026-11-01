@@ -86,6 +86,8 @@ pub const CONFIG_FILES: &[&str] = &[
 pub const LIBRARY_FILES: &[&str] = &[
     TRACKS_DOCUMENT,
     "library/albums.json",
+    "library/lyrics.json",
+    "library/artwork.json",
     "library/artists.json",
     "library/playlists.json",
     "library/favorites.json",
@@ -275,6 +277,16 @@ impl StorageManager {
     /// Absolute path of a document inside the root.
     pub fn document_path(&self, rel: &str) -> PathBuf {
         self.root.join(rel)
+    }
+
+    /// Write an artwork asset atomically, sharing storage's write lock.
+    pub(crate) fn write_artwork_resource(&self, path: &Path, bytes: &[u8]) -> StorageResult<()> {
+        self.ensure_writable()?;
+        if path.parent() != Some(self.root.join("artwork/resources").as_path()) {
+            return Err(StorageError::UnknownDocument(path.display().to_string()));
+        }
+        let _write = lock(&self.write_lock);
+        write_atomic(path, bytes)
     }
 
     /// Reads a stored document.
@@ -1117,7 +1129,7 @@ fn ensure_layout(root: &Path) -> StorageResult<()> {
 /// destination, so an interruption leaves the previous copy untouched. If the
 /// replacement fails, the temporary file is removed and the destination keeps
 /// its current content.
-fn write_atomic(path: &Path, bytes: &[u8]) -> StorageResult<()> {
+pub(crate) fn write_atomic(path: &Path, bytes: &[u8]) -> StorageResult<()> {
     let directory = path
         .parent()
         .filter(|parent| !parent.as_os_str().is_empty())

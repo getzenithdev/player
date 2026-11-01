@@ -242,6 +242,8 @@ Duration is expressed in seconds. This example is not the final schema: document
 
 **Acceptance and testing:** maintain synchronization when pausing and seeking; apply timing offsets; display saved lyrics offline and handle missing or malformed lyrics without interrupting audio.
 
+**Implementation notes:** phase 7 implements bounded LRC/extended LRC/TXT and generic embedded-tag adapters, LRCLIB search, LyricsPlus v2 snapshot import, reviewed candidate selection/rejection, atomic offline persistence, editing/export and four position-driven display modes. See [lyrics-engine.md](lyrics-engine.md) for timing semantics, tests, manual acceptance and the verified LyricsPlus live-service blocker. Tracked as "En pruebas".
+
 ## Phase 8. Artwork Engine
 
 **Objective:** resolve valid artwork through independent providers and local resources.
@@ -267,6 +269,8 @@ Duration is expressed in seconds. This example is not the final schema: document
 **Deliverables:** adapters, fallback search, validation, cache, and animation controls.
 
 **Acceptance and testing:** verify priority, offline local use, and recovery from invalid images or unavailable providers. Missing artwork must not prevent music playback.
+
+**Implementation notes:** phase 8 implements content-validated PNG/JPEG/WebP/GIF assets, local/embedded discovery, reviewed Archive.org queries/downloads, authorized provider-manifest adapters, persisted priority/manual selection, provenance and bounded animation controls across library/player/lyrics views. See [artwork-engine.md](artwork-engine.md) for provider credential blockers, supported animation formats, tests and installed-platform acceptance. Tracked as "En pruebas".
 
 ## Phase 9. External Music Sources
 

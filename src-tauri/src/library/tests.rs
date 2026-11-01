@@ -324,3 +324,23 @@ fn external_tag_updates_refresh_unedited_tracks() {
     assert_eq!(updated.tracks[0].title, "Edited title");
     assert_eq!(updated.tracks[0].genre.as_deref(), Some("Rock"));
 }
+
+#[cfg(unix)]
+#[test]
+fn removing_a_location_through_a_symlink_alias_uses_canonical_identity() {
+    let f = Fixture::new();
+    let song = f.wav("song.wav");
+    let alias = f.root.join("music-alias");
+    std::os::unix::fs::symlink(&f.music, &alias).unwrap();
+    f.import();
+    let result = execute(
+        &f.storage,
+        LibraryAction::RemoveLocation {
+            path: alias.to_string_lossy().into_owned(),
+        },
+    )
+    .unwrap();
+    assert!(result.locations.is_empty());
+    assert!(result.tracks.is_empty());
+    assert!(song.is_file());
+}
