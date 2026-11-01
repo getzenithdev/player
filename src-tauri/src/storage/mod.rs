@@ -86,6 +86,7 @@ pub const CONFIG_FILES: &[&str] = &[
 pub const LIBRARY_FILES: &[&str] = &[
     TRACKS_DOCUMENT,
     "library/albums.json",
+    "library/lyrics.json",
     "library/artists.json",
     "library/playlists.json",
     "library/favorites.json",
@@ -1117,7 +1118,7 @@ fn ensure_layout(root: &Path) -> StorageResult<()> {
 /// destination, so an interruption leaves the previous copy untouched. If the
 /// replacement fails, the temporary file is removed and the destination keeps
 /// its current content.
-fn write_atomic(path: &Path, bytes: &[u8]) -> StorageResult<()> {
+pub(crate) fn write_atomic(path: &Path, bytes: &[u8]) -> StorageResult<()> {
     let directory = path
         .parent()
         .filter(|parent| !parent.as_os_str().is_empty())

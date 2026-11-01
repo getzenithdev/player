@@ -3,9 +3,11 @@ mod audio_persistence;
 mod commands;
 mod library;
 mod library_commands;
+mod lyrics;
 mod metadata;
 mod playlist_commands;
 mod playlists;
+mod resources;
 mod session;
 mod storage;
 
@@ -43,6 +45,7 @@ pub fn run() {
         })
         .invoke_handler(tauri::generate_handler![
             library_commands::library_action,
+            lyrics::lyrics_action,
             library_commands::library_artwork,
             playlist_commands::playlist_action,
             playlist_commands::history_snapshot,

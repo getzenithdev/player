@@ -104,7 +104,7 @@ export const phases: Phase[] = [
     name: "Letras",
     objective: "Buscar, guardar y mostrar letras con o sin sincronización.",
     view: "lyrics",
-    status: "Pendiente",
+    status: "En pruebas",
     checks: [
       "Leer letras locales, embebidas y de proveedores compatibles.",
       "Mantener la sincronía al pausar, buscar y ajustar el desfase.",

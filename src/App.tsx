@@ -18,6 +18,7 @@ import "./App.css";
 import { Library } from "./Library";
 import { Playlists } from "./Playlists";
 import { QueuePanel } from "./QueuePanel";
+import { Lyrics } from "./Lyrics";
 import { ListeningHistory } from "./ListeningHistory";
 
 const navigation: { view: View; label: string }[] = [
@@ -172,7 +173,6 @@ export default function App() {
   const [selectedPhase, setSelectedPhase] = useState(2);
   const [reviewed, setReviewed] = useState<string[]>([]);
   const [bands, setBands] = useState<number[]>(Array(10).fill(0));
-  const [lyricsMode, setLyricsMode] = useState("Normal");
   const [pickingFiles, setPickingFiles] = useState(false);
   const [seekValue, setSeekValue] = useState(0);
   const [seeking, setSeeking] = useState(false);
@@ -310,64 +310,7 @@ export default function App() {
       case "history":
         return <ListeningHistory audio={audio} />;
       case "lyrics":
-        return (
-          <>
-            <div className="tabs" role="tablist" aria-label="Modo de letras">
-              {["Normal", "Karaoke", "Minimalista", "Pantalla completa"].map(
-                (mode) => (
-                  <button
-                    key={mode}
-                    role="tab"
-                    id={`lyrics-${mode.replace(/\s+/g, "-")}`}
-                    aria-controls="lyrics-content"
-                    aria-selected={lyricsMode === mode}
-                    tabIndex={lyricsMode === mode ? 0 : -1}
-                    onKeyDown={navigateTabs}
-                    onClick={() => setLyricsMode(mode)}
-                  >
-                    {mode}
-                  </button>
-                ),
-              )}
-            </div>
-            <section
-              id="lyrics-content"
-              role="tabpanel"
-              aria-labelledby={`lyrics-${lyricsMode.replace(/\s+/g, "-")}`}
-            >
-              <div className="lyrics-preview">
-                <Icon name="lyrics" size={30} />
-                <h2>
-                  {lyricsMode === "Normal"
-                    ? "Las letras aparecerán aquí"
-                    : `Vista de letras: ${lyricsMode.toLowerCase()}`}
-                </h2>
-                <p>Selecciona una canción cuando el motor esté conectado.</p>
-                <span className="status">Fase 7 pendiente</span>
-              </div>
-            </section>
-            <div className="toolbar bottom-tools">
-              <label className="control-label">
-                Desfase{" "}
-                <input
-                  aria-label="Desfase de letras en milisegundos"
-                  type="number"
-                  value="0"
-                  disabled
-                />{" "}
-                ms
-              </label>
-              <div className="button-group">
-                <PendingButton phase={7}>Buscar letras</PendingButton>
-                <PendingButton phase={7}>Abrir LRC</PendingButton>
-              </div>
-            </div>
-            <p className="inline-note">
-              El selector permite revisar la navegación. La sincronización,
-              animación y pantalla completa real aún no están implementadas.
-            </p>
-          </>
-        );
+        return <Lyrics audio={audio} />;
       case "artwork":
         return (
           <>

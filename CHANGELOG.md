@@ -1,5 +1,11 @@
 # Changelog
 
+## Unreleased — Phase 7
+
+- Add offline lyrics storage, LRC/extended LRC/TXT and embedded-tag readers, LRCLIB search and LyricsPlus v2 snapshot import.
+- Add result ranking/rejection, local editing/export, per-song/global timing and four audio-position-driven display modes.
+- Add bounded provider requests, opt-in external queries and regression coverage; document the unavailable LyricsPlus live service.
+
 ## Unreleased — Phase 6
 
 - Add universal metadata v1 with retained original names, Unicode NFC/whitespace normalization and provider-neutral identities.

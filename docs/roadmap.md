@@ -242,6 +242,8 @@ Duration is expressed in seconds. This example is not the final schema: document
 
 **Acceptance and testing:** maintain synchronization when pausing and seeking; apply timing offsets; display saved lyrics offline and handle missing or malformed lyrics without interrupting audio.
 
+**Implementation notes:** phase 7 implements bounded LRC/extended LRC/TXT and generic embedded-tag adapters, LRCLIB search, LyricsPlus v2 snapshot import, reviewed candidate selection/rejection, atomic offline persistence, editing/export and four position-driven display modes. See [lyrics-engine.md](lyrics-engine.md) for timing semantics, tests, manual acceptance and the verified LyricsPlus live-service blocker. Tracked as "En pruebas".
+
 ## Phase 8. Artwork Engine
 
 **Objective:** resolve valid artwork through independent providers and local resources.
