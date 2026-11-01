@@ -268,6 +268,10 @@ impl StorageManager {
         }
     }
 
+    pub(crate) fn library_lock(&self) -> MutexGuard<'_, ()> {
+        lock(&self.operation_lock)
+    }
+
     /// Absolute path of a document inside the root.
     pub fn document_path(&self, rel: &str) -> PathBuf {
         self.root.join(rel)

@@ -21,6 +21,11 @@ export function Icon({ name, size = 20 }: { name: IconName; size?: number }) {
         <path d="M4 4v16M8 4v16M13 5l5-1 3 15-5 1z" />
       </>
     ),
+    history: (
+      <>
+        <path d="M3 11a9 9 0 1 1 3 7M3 5v6h6M12 7v5l3 2" />
+      </>
+    ),
     playlists: (
       <>
         <path d="M4 5h16M4 10h10M4 15h8M18 13v8M14 17h8" />

@@ -19,7 +19,7 @@ use std::{
 
 use rodio::{Decoder, DeviceSinkBuilder, MixerDeviceSink, Player, Source};
 use serde::{Deserialize, Serialize};
-use tauri::{AppHandle, Emitter, State};
+use tauri::{AppHandle, Emitter, Manager, State};
 
 const STATE_EVENT: &str = "audio:state";
 const POSITION_EVENT: &str = "audio:position";
@@ -47,40 +47,31 @@ pub enum PlaybackStatus {
     Error,
 }
 
-#[derive(Clone, Copy, Debug, Default, PartialEq, Eq, Serialize, Deserialize)]
-#[serde(rename_all = "lowercase")]
-pub enum RepeatMode {
-    #[default]
-    Off,
-    All,
-    One,
-}
+pub use crate::playlists::Entry as TrackSummary;
+pub use crate::session::RepeatMode;
+use crate::{
+    audio_persistence::PersistenceWriter,
+    playlists,
+    session::{self, SessionState, Visit},
+    storage::StorageManager,
+};
 
-#[derive(Clone, Debug, Serialize)]
-#[serde(rename_all = "camelCase")]
-pub struct TrackSummary {
-    pub path: String,
-    pub title: String,
-    pub format: String,
-    pub duration_ms: Option<u64>,
-}
-
-impl TrackSummary {
-    fn from_path(path: &Path) -> Self {
-        let title = path
-            .file_stem()
-            .and_then(|stem| stem.to_str())
-            .filter(|stem| !stem.is_empty())
-            .unwrap_or("Pista sin título")
-            .to_string();
-
-        Self {
-            path: path.to_string_lossy().into_owned(),
-            title,
-            format: format_label(path),
-            duration_ms: None,
-        }
-    }
+#[derive(Deserialize)]
+#[serde(tag = "kind", rename_all = "camelCase")]
+pub enum QueueAction {
+    Append {
+        paths: Vec<String>,
+        after_current: bool,
+    },
+    Remove {
+        id: String,
+    },
+    Move {
+        id: String,
+        before_id: Option<String>,
+    },
+    Save,
+    Restore,
 }
 
 #[derive(Clone, Debug, Serialize)]
@@ -145,7 +136,10 @@ pub struct AudioCapabilities {
 }
 
 enum AudioCommand {
-    SetQueue { paths: Vec<String>, play: bool },
+    SetQueue {
+        paths: Vec<String>,
+        play: bool,
+    },
     PlayIndex(usize),
     Play,
     Pause,
@@ -160,6 +154,12 @@ enum AudioCommand {
     SetShuffle(bool),
     RestartOutput,
     ClearQueue,
+    SetEntries {
+        entries: Vec<TrackSummary>,
+        play: bool,
+    },
+    QueueAction(QueueAction),
+    Flush(Sender<Result<(), String>>),
 }
 
 /// Handle stored in Tauri state. All audio work happens on the worker thread.
@@ -206,6 +206,21 @@ impl AudioEngine {
         }
 
         self.send(AudioCommand::SetQueue { paths, play })
+    }
+
+    pub fn queue_action(&self, action: QueueAction) -> Result<(), String> {
+        self.send(AudioCommand::QueueAction(action))
+    }
+    pub fn open_entries(&self, entries: Vec<TrackSummary>, play: bool) -> Result<(), String> {
+        playlists::validate_entries(&entries)?;
+        self.send(AudioCommand::SetEntries { entries, play })
+    }
+    pub fn flush(&self) -> Result<(), String> {
+        let (reply, receive) = mpsc::channel();
+        self.send(AudioCommand::Flush(reply))?;
+        receive
+            .recv_timeout(Duration::from_secs(6))
+            .map_err(|e| e.to_string())?
     }
 
     pub fn play_index(&self, index: usize) -> Result<(), String> {
@@ -317,6 +332,12 @@ struct AudioWorker {
     last_position: Duration,
     stalled_ticks: u32,
     recoveries: u8,
+    listened: Duration,
+    listen_position: Duration,
+    visit: Option<Visit>,
+    restored: bool,
+    writer: PersistenceWriter,
+    last_checkpoint: std::time::Instant,
 }
 
 impl AudioWorker {
@@ -325,6 +346,7 @@ impl AudioWorker {
         shared: Arc<Mutex<PlaybackSnapshot>>,
         commands: Receiver<AudioCommand>,
     ) -> Self {
+        let writer = PersistenceWriter::new(app.clone());
         Self {
             app,
             shared,
@@ -349,10 +371,22 @@ impl AudioWorker {
             last_position: Duration::ZERO,
             stalled_ticks: 0,
             recoveries: 0,
+            listened: Duration::ZERO,
+            listen_position: Duration::ZERO,
+            visit: None,
+            restored: false,
+            writer,
+            last_checkpoint: std::time::Instant::now(),
         }
     }
 
     fn run(mut self) {
+        match session::restore(&self.app.state::<StorageManager>(), false) {
+            Ok(state) => self.restore_state(state),
+            Err(error) => {
+                self.error = Some(format!("No se pudo restaurar la sesión: {error}"));
+            }
+        }
         if let Err(error) = self.open_output() {
             self.error = Some(error);
             self.status = PlaybackStatus::Error;
@@ -403,6 +437,157 @@ impl AudioWorker {
             }
             AudioCommand::RestartOutput => self.restart_output(),
             AudioCommand::ClearQueue => self.clear_queue(),
+            AudioCommand::SetEntries { entries, play } => self.set_entries(entries, play),
+            AudioCommand::QueueAction(action) => self.edit_queue(action),
+            AudioCommand::Flush(reply) => {
+                let _ = reply.send(self.writer.flush(self.checkpoint_state()));
+            }
+        }
+    }
+
+    fn checkpoint_state(&self) -> SessionState {
+        let mut visit = self.visit.clone();
+        if let Some(v) = &mut visit {
+            v.listened_ms = duration_ms(self.listened);
+            v.position_ms = duration_ms(self.position);
+        }
+        SessionState {
+            queue: self.queue.clone(),
+            current_id: self
+                .current
+                .and_then(|i| self.queue.get(i))
+                .map(|e| e.id.clone()),
+            position_ms: duration_ms(self.position),
+            volume: self.volume,
+            muted: self.muted,
+            repeat: self.repeat,
+            shuffle: self.shuffle,
+            visit,
+        }
+    }
+    fn persist(&self, save: bool) {
+        self.writer.checkpoint(self.checkpoint_state(), save);
+    }
+    fn restore_state(&mut self, state: SessionState) {
+        self.clear_player();
+        self.queue = state.queue;
+        self.current = state
+            .current_id
+            .as_ref()
+            .and_then(|id| self.queue.iter().position(|e| &e.id == id));
+        self.position = Duration::from_millis(state.position_ms);
+        self.volume = state.volume;
+        self.muted = state.muted;
+        self.repeat = state.repeat;
+        self.shuffle = state.shuffle;
+        self.listened = Duration::from_millis(
+            state
+                .visit
+                .as_ref()
+                .map(|v| v.listened_ms)
+                .unwrap_or_default(),
+        );
+        self.visit = state.visit;
+        self.listen_position = self.position;
+        self.restored = self.current.is_some();
+        self.duration = self
+            .current
+            .and_then(|i| self.queue[i].duration_ms)
+            .map(Duration::from_millis);
+        self.status = PlaybackStatus::Stopped;
+        self.sample_rate = None;
+        self.channels = None;
+        self.format = self
+            .current
+            .and_then(|i| self.queue.get(i))
+            .map(|e| e.format.clone());
+        self.error = None;
+        self.apply_volume();
+    }
+    fn edit_queue(&mut self, action: QueueAction) {
+        match action {
+            QueueAction::Save => {
+                self.persist(true);
+                return;
+            }
+            QueueAction::Restore => {
+                // Flush earlier actor checkpoints before reading the saved queue.
+                if let Err(error) = self.writer.flush(self.checkpoint_state()) {
+                    self.set_error(error);
+                    return;
+                }
+                let restored = session::restore(&self.app.state::<StorageManager>(), true);
+                match restored {
+                    Ok(state) => {
+                        self.restore_state(state);
+                        self.publish();
+                    }
+                    Err(error) => self.set_error(error),
+                }
+                return;
+            }
+            _ => {}
+        }
+        self.persist(false);
+        let current_id = self
+            .current
+            .and_then(|i| self.queue.get(i))
+            .map(|e| e.id.clone());
+        let old_index = self.current.unwrap_or(0);
+        let playing = self.status == PlaybackStatus::Playing;
+        let result = (|| -> Result<(), String> {
+            match action {
+                QueueAction::Append {
+                    paths,
+                    after_current,
+                } => {
+                    let mut entries: Vec<_> = paths
+                        .iter()
+                        .map(|p| TrackSummary::from_path(Path::new(p)))
+                        .collect();
+                    playlists::validate_entries(&entries)?;
+                    let library = playlists::library_tracks(&self.app.state::<StorageManager>())?;
+                    playlists::resolve_entries(&mut entries, &library);
+                    if self.queue.len().saturating_add(entries.len()) > 100_000 {
+                        return Err("La cola supera 100000 entradas".into());
+                    }
+                    let at = if after_current {
+                        self.current.map(|i| i + 1).unwrap_or(self.queue.len())
+                    } else {
+                        self.queue.len()
+                    };
+                    self.queue.splice(at..at, entries);
+                }
+                QueueAction::Remove { id } => {
+                    if !self.queue.iter().any(|e| e.id == id) {
+                        return Err("La entrada ya no existe".into());
+                    }
+                    self.queue.retain(|e| e.id != id);
+                }
+                QueueAction::Move { id, before_id } => {
+                    playlists::move_before(&mut self.queue, &id, before_id.as_deref())?
+                }
+                QueueAction::Save | QueueAction::Restore => {}
+            }
+            Ok(())
+        })();
+        if let Err(error) = result {
+            self.set_error(error);
+            return;
+        }
+        self.current = current_id
+            .as_ref()
+            .and_then(|id| self.queue.iter().position(|e| &e.id == id));
+        if current_id.is_some() && self.current.is_none() {
+            self.visit = None;
+            self.restored = false;
+            if self.queue.is_empty() {
+                self.clear_queue();
+                return;
+            }
+            self.start_index(old_index.min(self.queue.len() - 1), playing, None);
+        } else {
+            self.publish();
         }
     }
 
@@ -424,10 +609,26 @@ impl AudioWorker {
     }
 
     fn set_queue(&mut self, paths: Vec<String>, play: bool) {
-        self.queue = paths
-            .iter()
-            .map(|path| TrackSummary::from_path(Path::new(path)))
-            .collect();
+        self.set_entries(
+            paths
+                .iter()
+                .map(|path| TrackSummary::from_path(Path::new(path)))
+                .collect(),
+            play,
+        );
+    }
+
+    fn set_entries(&mut self, mut entries: Vec<TrackSummary>, play: bool) {
+        self.persist(false);
+        if let Ok(library) = playlists::library_tracks(&self.app.state::<StorageManager>()) {
+            playlists::resolve_entries(&mut entries, &library);
+        }
+        for entry in &mut entries {
+            entry.id = playlists::new_id();
+        }
+        self.queue = entries;
+        self.visit = None;
+        self.restored = false;
         self.current = None;
         self.clear_player();
         self.position = Duration::ZERO;
@@ -438,8 +639,8 @@ impl AudioWorker {
         self.error = None;
         self.recoveries = 0;
 
-        if play && !self.queue.is_empty() {
-            self.start_index(0, true, None);
+        if play && let Some(index) = self.queue.iter().position(|e| Path::new(&e.path).is_file()) {
+            self.start_index(index, true, None);
         } else {
             self.status = PlaybackStatus::Idle;
             self.publish();
@@ -447,6 +648,9 @@ impl AudioWorker {
     }
 
     fn clear_queue(&mut self) {
+        self.persist(false);
+        self.visit = None;
+        self.restored = false;
         self.queue.clear();
         self.current = None;
         self.clear_player();
@@ -474,7 +678,12 @@ impl AudioWorker {
             return;
         }
 
+        self.persist(false);
+        self.restored = false;
         if start_at.is_none() {
+            self.visit = None;
+            self.listened = Duration::ZERO;
+            self.listen_position = Duration::ZERO;
             self.recoveries = 0;
         }
 
@@ -516,9 +725,17 @@ impl AudioWorker {
         player.set_volume(self.effective_volume());
         player.append(decoder);
 
-        let position = start_at.unwrap_or(Duration::ZERO);
-        if position > Duration::ZERO {
-            let _ = player.try_seek(position);
+        let mut position = start_at.unwrap_or(Duration::ZERO);
+        if let Some(duration) = info.duration {
+            position = position.min(duration);
+        }
+        if position > Duration::ZERO
+            && let Err(error) = player.try_seek(position)
+        {
+            position = Duration::ZERO;
+            self.error = Some(format!(
+                "No se pudo restaurar la posición; la pista comienza desde el inicio: {error}"
+            ));
         }
 
         if autoplay {
@@ -527,6 +744,9 @@ impl AudioWorker {
             player.pause();
         }
 
+        if self.visit.is_none() {
+            self.visit = Some(Visit::new(self.queue[index].clone()));
+        }
         self.current = Some(index);
         self.position = position;
         self.duration = info.duration;
@@ -534,6 +754,7 @@ impl AudioWorker {
         self.channels = Some(info.channels);
         self.format = Some(format_label(Path::new(&path)));
         self.last_position = position;
+        self.listen_position = position;
         self.stalled_ticks = 0;
         self.status = if autoplay {
             PlaybackStatus::Playing
@@ -550,6 +771,19 @@ impl AudioWorker {
     }
 
     fn resume(&mut self) {
+        if self.restored {
+            if self.player.is_none()
+                && let Err(error) = self.open_output()
+            {
+                self.set_error(error);
+                return;
+            }
+            if let Some(index) = self.current {
+                self.start_index(index, true, Some(self.position));
+                return;
+            }
+            self.restored = false;
+        }
         match self.status {
             PlaybackStatus::Playing => {}
             PlaybackStatus::Paused => {
@@ -564,8 +798,10 @@ impl AudioWorker {
             PlaybackStatus::Stopped | PlaybackStatus::Idle | PlaybackStatus::Error => {
                 if let Some(index) = self.current {
                     self.start_index(index, true, None);
-                } else if !self.queue.is_empty() {
-                    self.start_index(0, true, None);
+                } else if let Some(index) =
+                    self.queue.iter().position(|e| Path::new(&e.path).is_file())
+                {
+                    self.start_index(index, true, None);
                 } else {
                     self.status = PlaybackStatus::Idle;
                     self.publish();
@@ -596,6 +832,11 @@ impl AudioWorker {
     }
 
     fn seek(&mut self, position: Duration) {
+        if self.restored {
+            self.position = position;
+            self.publish();
+            return;
+        }
         if !matches!(
             self.status,
             PlaybackStatus::Playing | PlaybackStatus::Paused
@@ -615,6 +856,7 @@ impl AudioWorker {
             Ok(()) => {
                 self.position = target;
                 self.last_position = target;
+                self.listen_position = target;
                 self.stalled_ticks = 0;
                 self.error = None;
             }
@@ -626,22 +868,34 @@ impl AudioWorker {
         self.publish();
     }
 
+    fn available_index(&self, current: usize, forward: bool) -> Option<usize> {
+        let available: Vec<_> = self
+            .queue
+            .iter()
+            .enumerate()
+            .filter(|(_, e)| Path::new(&e.path).is_file())
+            .map(|(i, _)| i)
+            .collect();
+        session::available_index(
+            &available,
+            self.queue.len(),
+            current,
+            self.repeat == RepeatMode::All,
+            self.shuffle,
+            forward,
+            random_seed(),
+        )
+    }
+
     fn next_manual(&mut self) {
         let Some(current) = self.current else {
-            if !self.queue.is_empty() {
-                self.start_index(0, true, None);
+            if let Some(index) = self.queue.iter().position(|e| Path::new(&e.path).is_file()) {
+                self.start_index(index, true, None);
             }
             return;
         };
 
-        match step_index(
-            self.queue.len(),
-            current,
-            self.repeat,
-            self.shuffle,
-            true,
-            random_seed(),
-        ) {
+        match self.available_index(current, true) {
             Some(index) => self.start_index(index, true, None),
             None => self.stop(),
         }
@@ -654,20 +908,13 @@ impl AudioWorker {
         }
 
         let Some(current) = self.current else {
-            if !self.queue.is_empty() {
-                self.start_index(0, true, None);
+            if let Some(index) = self.queue.iter().position(|e| Path::new(&e.path).is_file()) {
+                self.start_index(index, true, None);
             }
             return;
         };
 
-        match step_index(
-            self.queue.len(),
-            current,
-            self.repeat,
-            self.shuffle,
-            false,
-            random_seed(),
-        ) {
+        match self.available_index(current, false) {
             Some(index) => self.start_index(index, true, None),
             None => self.seek(Duration::ZERO),
         }
@@ -679,19 +926,12 @@ impl AudioWorker {
             return;
         };
 
-        if self.repeat == RepeatMode::One {
+        if self.repeat == RepeatMode::One && Path::new(&self.queue[current].path).is_file() {
             self.start_index(current, true, None);
             return;
         }
 
-        match step_index(
-            self.queue.len(),
-            current,
-            self.repeat,
-            self.shuffle,
-            true,
-            random_seed(),
-        ) {
+        match self.available_index(current, true) {
             Some(index) => self.start_index(index, true, None),
             None => {
                 self.status = PlaybackStatus::Stopped;
@@ -716,7 +956,29 @@ impl AudioWorker {
             None => return,
         };
 
+        let position = if empty {
+            self.duration.unwrap_or(position)
+        } else {
+            position
+        };
         self.position = position;
+        let credited = session::listening_delta(
+            duration_ms(self.listen_position),
+            duration_ms(position),
+            self.status == PlaybackStatus::Playing,
+            paused,
+        );
+        self.listen_position = position;
+        self.listened += Duration::from_millis(credited);
+        if credited > 0
+            && let Some(visit) = &mut self.visit
+        {
+            visit.updated_at = playlists::now();
+        }
+        if self.last_checkpoint.elapsed() >= Duration::from_secs(5) {
+            self.persist(false);
+            self.last_checkpoint = std::time::Instant::now();
+        }
 
         if self.status != PlaybackStatus::Playing {
             return;
@@ -811,6 +1073,9 @@ impl AudioWorker {
     }
 
     fn publish(&self) {
+        if self.status != PlaybackStatus::Loading {
+            self.persist(false);
+        }
         let snapshot = PlaybackSnapshot {
             status: self.status.clone(),
             track: self
@@ -923,6 +1188,7 @@ fn random_seed() -> usize {
         .unwrap_or_else(|| usize::try_from(rand::random::<u64>()).unwrap_or(usize::MAX))
 }
 
+#[cfg(test)]
 fn step_index(
     len: usize,
     current: usize,
@@ -959,6 +1225,22 @@ fn step_index(
     } else {
         None
     }
+}
+
+#[tauri::command]
+pub fn audio_queue_action(
+    engine: State<'_, AudioEngine>,
+    action: QueueAction,
+) -> Result<(), String> {
+    engine.queue_action(action)
+}
+#[tauri::command]
+pub fn audio_open_entries(
+    engine: State<'_, AudioEngine>,
+    entries: Vec<TrackSummary>,
+    play: bool,
+) -> Result<(), String> {
+    engine.open_entries(entries, play)
 }
 
 #[tauri::command]

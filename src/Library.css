@@ -1,0 +1,183 @@
+.library-tabs {
+  flex-wrap: wrap;
+}
+.library-tabs button[aria-pressed="true"] {
+  background: transparent;
+  color: var(--accent);
+  border-bottom-color: var(--accent);
+  font-weight: 600;
+}
+.library-tracks {
+  display: grid;
+  gap: 5px;
+}
+.library-track {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 8px 0;
+  border-bottom: 1px solid color-mix(in srgb, currentColor 12%, transparent);
+}
+.library-cover {
+  width: 48px;
+  height: 48px;
+  flex: 0 0 48px;
+  border-radius: 7px;
+  object-fit: cover;
+}
+.library-cover-empty {
+  display: grid;
+  place-items: center;
+  background: color-mix(in srgb, currentColor 8%, transparent);
+  font-size: 24px;
+}
+.library-track-title {
+  flex: 1;
+  min-width: 0;
+  text-align: left;
+  background: none;
+  border: 0;
+  display: grid;
+  gap: 3px;
+  color: inherit;
+}
+.library-track-title > * {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.library-track-title span,
+.library-track-title small {
+  opacity: 0.65;
+}
+.library-track-title:disabled {
+  opacity: 0.5;
+}
+.library-duration {
+  font-variant-numeric: tabular-nums;
+}
+.library-group {
+  font-size: 17px;
+  margin-top: 22px;
+  overflow-wrap: anywhere;
+}
+.library-empty {
+  text-align: center;
+  padding: 65px 20px;
+}
+.library-error {
+  color: #ba302e;
+  overflow-wrap: anywhere;
+}
+.library-warnings {
+  max-height: 200px;
+  overflow: auto;
+  margin: 15px 0;
+}
+.library-locations {
+  margin: 30px 0;
+}
+.library-locations > div {
+  display: flex;
+  gap: 16px;
+  justify-content: space-between;
+  align-items: center;
+  padding: 10px 0;
+}
+.library-locations code {
+  overflow-wrap: anywhere;
+  min-width: 0;
+}
+.metadata-dialog {
+  color: inherit;
+  background: var(--surface, Canvas);
+  width: min(560px, 90vw);
+  max-height: 85vh;
+  border: 1px solid #8886;
+  border-radius: 18px;
+  padding: 24px;
+}
+.metadata-dialog::backdrop {
+  background: #0006;
+  backdrop-filter: blur(4px);
+}
+.metadata-dialog fieldset {
+  border: 0;
+  padding: 0;
+  display: grid;
+  gap: 12px;
+}
+.metadata-dialog label {
+  display: grid;
+  gap: 5px;
+}
+.metadata-dialog input {
+  width: 100%;
+  padding: 9px;
+  border: 1px solid #8886;
+  border-radius: 6px;
+  color: inherit;
+  background: transparent;
+}
+.metadata-numbers {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 12px;
+}
+.metadata-dialog .metadata-write {
+  display: flex;
+  gap: 10px;
+  align-items: center;
+}
+.metadata-write input {
+  width: auto;
+}
+.metadata-dialog footer {
+  display: flex;
+  justify-content: flex-end;
+  gap: 12px;
+}
+.music-library .toolbar {
+  flex-wrap: wrap;
+}
+@media (max-width: 760px) {
+  .library-track {
+    gap: 7px;
+  }
+  .library-track > button:last-child {
+    padding: 6px;
+  }
+  .library-duration {
+    display: none;
+  }
+}
+.music-library .toolbar > button,
+.library-track > button:not(.library-track-title),
+.library-locations button,
+.metadata-dialog footer button {
+  border: 1px solid var(--line);
+  border-radius: 6px;
+  padding: 8px 12px;
+  min-height: 34px;
+  background: var(--surface);
+  color: var(--text);
+}
+.music-library .toolbar > button:hover:not(:disabled),
+.library-track > button:hover:not(:disabled),
+.library-locations button:hover:not(:disabled) {
+  background: var(--hover);
+}
+.metadata-dialog footer button[type="submit"] {
+  background: var(--accent-soft);
+  border-color: var(--accent);
+}
+.metadata-provenance {
+  margin: 14px 0;
+}
+.metadata-provenance pre {
+  white-space: pre-wrap;
+  overflow-wrap: anywhere;
+  max-height: 220px;
+  overflow: auto;
+  font-size: 12px;
+}

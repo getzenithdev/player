@@ -1,0 +1,57 @@
+.playlists-panel .toolbar,
+.queue-panel .toolbar {
+  flex-wrap: wrap;
+}
+.playlist-picker {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  margin: 20px 0;
+}
+.playlists-panel .plain-list li {
+  gap: 12px;
+  flex-wrap: wrap;
+}
+.playlists-panel .queue-track {
+  min-width: 120px;
+  overflow-wrap: anywhere;
+}
+.playlists-panel .queue-track .secondary {
+  white-space: normal;
+}
+.library-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+}
+.library-actions select {
+  max-width: 150px;
+  min-width: 0;
+  border: 1px solid var(--line);
+  background: var(--surface);
+  color: inherit;
+  border-radius: 6px;
+  padding: 6px;
+}
+.history-row {
+  display: grid;
+  gap: 4px;
+  flex: 1;
+  min-width: 0;
+}
+.queue-list .queue-track {
+  min-width: 0;
+  overflow-wrap: anywhere;
+}
+@media (max-width: 800px) {
+  .library-track {
+    flex-wrap: wrap;
+  }
+  .library-actions {
+    width: 100%;
+    padding-left: 60px;
+  }
+  .queue-list li {
+    flex-wrap: wrap;
+  }
+}

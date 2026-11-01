@@ -12,7 +12,7 @@ use serde_json::Value;
 use super::error::{StorageError, StorageResult};
 
 /// Format version written by this build.
-pub const SCHEMA_VERSION: u32 = 1;
+pub const SCHEMA_VERSION: u32 = 2;
 
 /// Stored envelope: `{"version": n, "updated_at": n, "data": ...}`.
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -110,11 +110,11 @@ pub fn decode_envelope_value(path: &Path, value: Value) -> StorageResult<Decoded
 
 /// Brings a payload from `from` up to [`SCHEMA_VERSION`].
 ///
-/// Version 1 is the first published format, so there is nothing to transform
-/// yet. When a version 2 exists this function gains one step per released
-/// change, and older files keep loading instead of being discarded.
+/// Version 2 protects universal metadata from older binaries that would
+/// discard unknown track fields. Version 1 payloads are preserved verbatim;
+/// metadata preparation upgrades legacy track identities in one atomic write.
 fn migrate(from: u32, data: Value, path: &Path) -> StorageResult<Value> {
-    if from == SCHEMA_VERSION {
+    if from == 1 || from == SCHEMA_VERSION {
         return Ok(data);
     }
     Err(StorageError::InvalidValue {

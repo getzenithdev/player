@@ -2,6 +2,7 @@ export type View =
   | "library"
   | "playlists"
   | "queue"
+  | "history"
   | "lyrics"
   | "artwork"
   | "sources"
@@ -65,7 +66,7 @@ export const phases: Phase[] = [
     objective:
       "Importar, organizar y mantener actualizados los archivos musicales.",
     view: "library",
-    status: "Pendiente",
+    status: "En pruebas",
     checks: [
       "Importar una carpeta dos veces sin duplicar sus entradas.",
       "Detectar archivos agregados, modificados, movidos y eliminados.",
@@ -78,7 +79,7 @@ export const phases: Phase[] = [
     objective:
       "Organizar listas y una cola independiente que se pueda restaurar.",
     view: "playlists",
-    status: "Pendiente",
+    status: "En pruebas",
     checks: [
       "Crear, editar, reordenar e intercambiar listas.",
       "Modificar la cola sin cambiar la lista de origen.",
@@ -91,7 +92,7 @@ export const phases: Phase[] = [
     objective:
       "Identificar pistas de distintas fuentes sin confundir sus versiones.",
     view: "library",
-    status: "Pendiente",
+    status: "En pruebas",
     checks: [
       "Conservar la identidad interna al reiniciar o mover archivos.",
       "Distinguir versiones en vivo, remixes y artistas homónimos.",

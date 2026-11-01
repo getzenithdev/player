@@ -164,6 +164,8 @@ Evaluate Kira, Symphonia, and CPAL, with Rodio as an alternative, distinguishing
 
 **Acceptance and testing:** import a location twice without duplicating its entries; reconcile moved or deleted files and continue past unreadable files. Verify that internal edits do not change original files without an explicit request.
 
+**Implementation notes:** phase 4 is implemented in `src-tauri/src/library.rs`, its native command/monitor adapter, and `src/Library.tsx`. It includes persistent locations, content-probed metadata/artwork, polling reconciliation, stable IDs across unambiguous hash-confirmed moves, duplicate reporting, grouped views, favorites/statistics, and an internal metadata editor with explicit staged tag writing. See [music-library.md](music-library.md) for the storage contract, tests, limitations, and manual platform acceptance checklist. The interface tracks this as "En pruebas" until those installed-build checks are recorded.
+
 ## Phase 5. Playlists, Queue, and History
 
 **Objective:** manage playlists and an independent queue with session restoration.
@@ -180,6 +182,8 @@ Evaluate Kira, Symphonia, and CPAL, with Rodio as an alternative, distinguishing
 **Deliverables:** playlist manager, interchange formats, persistent queue, and history.
 
 **Acceptance and testing:** export and import a playlist while preserving order and compatible paths; restore a session and verify that queue changes do not alter saved playlists.
+
+**Implementation notes:** phase 5 is implemented by the playlist manager/interchange module, audio-owned queue operations, and ordered session/history persistence. The interface includes persistent playlists, queue editing and save/restore, library-to-list/queue actions, and detailed listening history. See [playlists-queue.md](playlists-queue.md) for storage contracts, tests, PLS evaluation, counting/missing-file policies, and manual desktop acceptance. The phase is tracked as "En pruebas" until installed-platform acceptance is recorded.
 
 ## Phase 6. Metadata Engine
 
@@ -219,6 +223,8 @@ Duration is expressed in seconds. This example is not the final schema: document
 **Deliverables:** versioned universal schema, normalizer, and identification rules.
 
 **Acceptance and testing:** distinguish versions with similar titles, preserve identities after restart, and handle incomplete metadata without losing entries.
+
+**Implementation notes:** phase 6 is implemented by the universal metadata contract v1, the v2 storage envelope with v1 migration, source-identity upserts, NFC/whitespace normalization with original values, local identifier extraction, and conservative recording/album/artist comparison. The library exposes adapter JSON import, identifier search, provenance inspection and ambiguity notices. See [metadata-engine.md](metadata-engine.md) for contract details, matching rules, regression coverage and pending installed-platform acceptance. The phase is tracked as "En pruebas".
 
 ## Phase 7. Lyrics Engine
 

@@ -1,3 +1,4 @@
+import type { MediaEntry, QueueAction } from "./playlists";
 import { invoke } from "@tauri-apps/api/core";
 import { listen, type UnlistenFn } from "@tauri-apps/api/event";
 import { open } from "@tauri-apps/plugin-dialog";
@@ -8,12 +9,7 @@ export type PlaybackStatus =
 
 export type RepeatMode = "off" | "all" | "one";
 
-export interface TrackSummary {
-  path: string;
-  title: string;
-  format: string;
-  durationMs: number | null;
-}
+export type TrackSummary = MediaEntry;
 
 export interface PlaybackSnapshot {
   status: PlaybackStatus;
@@ -107,6 +103,7 @@ export function useAudioEngine() {
   const [capabilities, setCapabilities] = useState<AudioCapabilities | null>(
     null,
   );
+  const [notice, setNotice] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
 
   useEffect(() => {
@@ -128,6 +125,16 @@ export function useAudioEngine() {
         if (disposed) return;
         setSnapshot(current);
         setCapabilities(details);
+        attach(
+          await listen<string>("audio:persistence-error", (event) =>
+            setError(event.payload),
+          ),
+        );
+        attach(
+          await listen<string>("audio:notice", (event) =>
+            setNotice(event.payload),
+          ),
+        );
         attach(
           await listen<PlaybackSnapshot>("audio:state", (event) => {
             setSnapshot(event.payload);
@@ -176,6 +183,15 @@ export function useAudioEngine() {
     (paths: string[], play = true) => run("audio_open_files", { paths, play }),
     [run],
   );
+  const openEntries = useCallback(
+    (entries: MediaEntry[], play = true) =>
+      run("audio_open_entries", { entries, play }),
+    [run],
+  );
+  const queueAction = useCallback(
+    (action: QueueAction) => run("audio_queue_action", { action }),
+    [run],
+  );
   const playIndex = useCallback(
     (index: number) => run("audio_play_index", { index }),
     [run],
@@ -216,6 +232,9 @@ export function useAudioEngine() {
     error,
     reportError,
     openFiles,
+    openEntries,
+    queueAction,
+    notice,
     playIndex,
     play,
     pause,
