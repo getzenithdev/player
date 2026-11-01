@@ -387,7 +387,11 @@ fn lyrics_plus(raw: &str, track: &TrackEntry) -> Result<Candidate, String> {
     for row in rows.iter().take(10000) {
         let start = row["time"].as_u64().ok_or("Falta time en milisegundos")?;
         text.push_str(&stamp(start));
-        if let Some(words) = row["syllables"].as_array() {
+        if let Some(words) = row["syllabus"]
+            .as_array()
+            .or_else(|| row["syllables"].as_array())
+            .filter(|words| !words.is_empty())
+        {
             for word in words {
                 let at = word["time"].as_u64().ok_or("Falta tiempo de sílaba")?;
                 text.push_str(&stamp(at).replace('[', "<").replace(']', ">"));
@@ -608,7 +612,7 @@ mod tests {
     }
     #[test]
     fn plus_word_adapter() {
-        let c=lyrics_plus(r#"{"lyrics":[{"time":1000,"syllables":[{"time":1000,"text":"Hi "},{"time":1500,"text":"there"}]}]}"#,&TrackEntry::default()).unwrap();
+        let c=lyrics_plus(r#"{"lyrics":[{"time":1000,"syllabus":[{"time":1000,"text":"Hi "},{"time":1500,"text":"there"}]}]}"#,&TrackEntry::default()).unwrap();
         assert_eq!(c.parsed.lines[0].words.len(), 2);
     }
     #[test]

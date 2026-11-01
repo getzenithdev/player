@@ -26,6 +26,7 @@ lofty = "0.25.4"
 sha2 = "0.10"
 base64 = "0.22"
 unicode-normalization = "0.1"
+image = { version = "0.25", default-features = false, features = ["png", "jpeg", "webp", "gif"] }
 reqwest = { version = "0.13.5", default-features = false, features = ["blocking", "rustls"] }
 rodio = { version = "0.23", default-features = false, features = [
   "playback",

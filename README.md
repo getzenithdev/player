@@ -79,3 +79,5 @@ GitHub Actions checks the frontend and compiles Windows x64, macOS Intel/Apple S
 - [Development roadmap](docs/roadmap.md)
 
 Lyrics / Letras: [Phase 7 implementation and provider status](docs/lyrics-engine.md).
+
+Artwork / Portadas: [Phase 8 implementation and provider status](docs/artwork-engine.md).

@@ -270,6 +270,8 @@ Duration is expressed in seconds. This example is not the final schema: document
 
 **Acceptance and testing:** verify priority, offline local use, and recovery from invalid images or unavailable providers. Missing artwork must not prevent music playback.
 
+**Implementation notes:** phase 8 implements content-validated PNG/JPEG/WebP/GIF assets, local/embedded discovery, reviewed Archive.org queries/downloads, authorized provider-manifest adapters, persisted priority/manual selection, provenance and bounded animation controls across library/player/lyrics views. See [artwork-engine.md](artwork-engine.md) for provider credential blockers, supported animation formats, tests and installed-platform acceptance. Tracked as "En pruebas".
+
 ## Phase 9. External Music Sources
 
 **Objective:** integrate local and external sources through a shared contract.

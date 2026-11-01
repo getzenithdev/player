@@ -18,6 +18,8 @@ import "./App.css";
 import { Library } from "./Library";
 import { Playlists } from "./Playlists";
 import { QueuePanel } from "./QueuePanel";
+import { Artwork } from "./Artwork";
+import { TrackArtwork } from "./TrackArtwork";
 import { Lyrics } from "./Lyrics";
 import { ListeningHistory } from "./ListeningHistory";
 
@@ -312,40 +314,7 @@ export default function App() {
       case "lyrics":
         return <Lyrics audio={audio} />;
       case "artwork":
-        return (
-          <>
-            <p className="page-description">
-              Portadas estáticas y animadas, con una alternativa local.
-            </p>
-            <div className="artwork-layout">
-              <div className="artwork-placeholder">
-                <Icon name="artwork" size={54} />
-                <span>Sin portada</span>
-              </div>
-              <div>
-                <h2>Orden de búsqueda previsto</h2>
-                <ol className="provider-order">
-                  {[
-                    "Apple Music · animada",
-                    "Apple Music · estática",
-                    "Archive.org",
-                    "YouTube",
-                    "Portada local",
-                    "Imagen predeterminada",
-                  ].map((item) => (
-                    <li key={item}>{item}</li>
-                  ))}
-                </ol>
-                <PendingButton phase={8}>Buscar portada</PendingButton>
-              </div>
-            </div>
-            <div className="module-note">
-              Sin conexión se usarán recursos guardados y portadas locales. La
-              obtención y reproducción de recursos autorizados se implementará
-              en la fase 8.
-            </div>
-          </>
-        );
+        return <Artwork audio={audio} />;
       case "sources":
         return (
           <>
@@ -905,9 +874,11 @@ export default function App() {
       </main>
       <footer className="player-bar" aria-label="Reproductor">
         <div className="now-playing">
-          <div className="mini-artwork">
-            <Icon name="music" />
-          </div>
+          <TrackArtwork
+            className="mini-artwork"
+            trackId={track?.trackId}
+            path={track?.path}
+          />
           <div>
             <strong>{track?.title ?? "Sin reproducción"}</strong>
             <span>

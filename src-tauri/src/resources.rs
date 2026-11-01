@@ -26,18 +26,41 @@ pub fn get(url: reqwest::Url, max: usize) -> Result<Vec<u8>, String> {
         || !url.username().is_empty()
         || url.password().is_some()
         || url.port().is_some_and(|p| p != 443)
-        || !(host == "lrclib.net" || host == "archive.org")
+        || !(host == "lrclib.net" || host == "archive.org" || host.ends_with(".archive.org"))
     {
         return Err("Proveedor HTTPS no autorizado".into());
     }
     let mut until = REQUESTS.lock().unwrap_or_else(|p| p.into_inner());
+    if let Some(t) = *until
+        && t > Instant::now()
+        && t.duration_since(Instant::now()) <= Duration::from_millis(500)
+    {
+        std::thread::sleep(t.saturating_duration_since(Instant::now()));
+    }
     if until.is_some_and(|t| t > Instant::now()) {
         return Err("El proveedor pide esperar antes de volver a consultar".into());
     }
     let client = reqwest::blocking::Client::builder()
         .timeout(Duration::from_secs(15))
         .connect_timeout(Duration::from_secs(5))
-        .redirect(reqwest::redirect::Policy::none())
+        .redirect(reqwest::redirect::Policy::custom(|attempt| {
+            if attempt.previous().len() >= 3 {
+                return attempt.error("Demasiadas redirecciones");
+            }
+            let url = attempt.url();
+            if url.scheme() == "https"
+                && url.username().is_empty()
+                && url.password().is_none()
+                && url.port().is_none_or(|p| p == 443)
+                && url
+                    .host_str()
+                    .is_some_and(|h| h == "archive.org" || h.ends_with(".archive.org"))
+            {
+                attempt.follow()
+            } else {
+                attempt.stop()
+            }
+        }))
         .user_agent("ZenithPlayer/0.1.0 (https://github.com/getzenithdev/player)")
         .build()
         .map_err(|e| e.to_string())?;

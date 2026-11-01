@@ -1,5 +1,12 @@
 # Changelog
 
+## Unreleased — Phase 8
+
+- Add validated content-addressed artwork originals, previews, thumbnails and provenance with offline fallback and manual priority overrides.
+- Add local/embedded discovery, opt-in Archive.org search with license checks, and authorized Apple Music/YouTube manifest import.
+- Connect artwork to library, player and lyrics backgrounds; add bounded GIF animation with pause, looping, visibility, reduced-motion and battery controls.
+- Verify LyricsPlus v2 `syllabus` timing against its source and retain import compatibility with `syllables`.
+
 ## Unreleased — Phase 7
 
 - Add offline lyrics storage, LRC/extended LRC/TXT and embedded-tag readers, LRCLIB search and LyricsPlus v2 snapshot import.

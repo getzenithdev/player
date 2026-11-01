@@ -11,6 +11,7 @@ import {
 } from "./lyrics";
 import { useResourceTrack } from "./ResourceTrack";
 import "./Resources.css";
+import { TrackArtwork } from "./TrackArtwork";
 export function Lyrics({ audio }: { audio: AudioController }) {
   const { track, error: trackError, selector } = useResourceTrack(audio);
   const [snapshot, setSnapshot] = useState<LyricsSnapshot>(defaultLyrics);
@@ -69,12 +70,23 @@ export function Lyrics({ audio }: { audio: AudioController }) {
     (candidate?.parsed.offset ?? 0);
   const line = activeLine(candidate?.parsed.lines ?? [], position, offset);
   useEffect(() => {
-    active.current?.scrollIntoView({
-      block: "center",
-      behavior: window.matchMedia("(prefers-reduced-motion: reduce)").matches
-        ? "instant"
-        : "smooth",
-    });
+    const node = active.current;
+    const pane = node?.parentElement;
+    if (node && pane) {
+      const rect = node.getBoundingClientRect();
+      const parent = pane.getBoundingClientRect();
+      pane.scrollTo({
+        top:
+          pane.scrollTop +
+          rect.top -
+          parent.top -
+          pane.clientHeight / 2 +
+          rect.height / 2,
+        behavior: window.matchMedia("(prefers-reduced-motion: reduce)").matches
+          ? "instant"
+          : "smooth",
+      });
+    }
   }, [line]);
   async function run(action: object) {
     if (!trackId) return;
@@ -157,6 +169,14 @@ export function Lyrics({ audio }: { audio: AudioController }) {
         } as CSSProperties
       }
     >
+      {(preferences.mode === "minimal" ||
+        preferences.mode === "fullscreen") && (
+        <TrackArtwork
+          className="lyric-backdrop"
+          trackId={trackId}
+          fallbackId={track?.artwork_id}
+        />
+      )}
       {selector}
       {!track ? (
         <p>

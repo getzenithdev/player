@@ -1,3 +1,4 @@
+mod artwork;
 mod audio;
 mod audio_persistence;
 mod commands;
@@ -46,6 +47,9 @@ pub fn run() {
         .invoke_handler(tauri::generate_handler![
             library_commands::library_action,
             lyrics::lyrics_action,
+            artwork::artwork_action,
+            artwork::artwork_data,
+            artwork::artwork_frames,
             library_commands::library_artwork,
             playlist_commands::playlist_action,
             playlist_commands::history_snapshot,

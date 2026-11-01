@@ -116,7 +116,7 @@ export const phases: Phase[] = [
     name: "Portadas",
     objective: "Encontrar portadas válidas y conservar alternativas locales.",
     view: "artwork",
-    status: "Pendiente",
+    status: "En pruebas",
     checks: [
       "Comprobar el orden de proveedores y la alternativa local.",
       "Rechazar imágenes inválidas y conservar los recursos permitidos.",

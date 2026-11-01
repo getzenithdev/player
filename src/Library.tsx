@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useRef, useState } from "react";
-import { invoke, isTauri } from "@tauri-apps/api/core";
+import { isTauri } from "@tauri-apps/api/core";
 import { listen } from "@tauri-apps/api/event";
 import { open } from "@tauri-apps/plugin-dialog";
 import { pickAudioFiles, type AudioController } from "./audio";
@@ -16,31 +16,10 @@ import {
   type MetadataEdit,
 } from "./library";
 import "./Library.css";
+import { TrackArtwork } from "./TrackArtwork";
 import { entryFromTrack, usePlaylists } from "./playlists";
 import "./Playlists.css";
 
-function Cover({ id }: { id: string | null }) {
-  const [url, setUrl] = useState<string | null>(null);
-  useEffect(() => {
-    let disposed = false;
-    if (id && isTauri())
-      void invoke<string>("library_artwork", { id })
-        .then((value) => {
-          if (!disposed) setUrl(value);
-        })
-        .catch(() => {});
-    return () => {
-      disposed = true;
-    };
-  }, [id]);
-  return url ? (
-    <img className="library-cover" src={url} alt="" />
-  ) : (
-    <span className="library-cover library-cover-empty" aria-hidden="true">
-      ♫
-    </span>
-  );
-}
 export function Library({ audio }: { audio: AudioController }) {
   const lists = usePlaylists();
   const [library, setLibrary] = useState(emptyLibrary);
@@ -287,7 +266,11 @@ export function Library({ audio }: { audio: AudioController }) {
           <div className="library-tracks">
             {items.map((t) => (
               <article className="library-track" key={t.id}>
-                <Cover key={t.artwork_id} id={t.artwork_id} />
+                <TrackArtwork
+                  className="library-cover"
+                  trackId={t.id}
+                  fallbackId={t.artwork_id}
+                />
                 <button
                   className="library-track-title"
                   disabled={t.missing || !t.local_path}
