@@ -1,5 +1,11 @@
 # Changelog
 
+## CI portability fixes
+
+- Normalize location-removal paths using the same canonical identity as import on macOS and Windows.
+- Flush staged metadata files through writable handles on Windows; preserve original/recovery-copy safeguards.
+- Run Intel macOS validation on the actual Intel runner instead of repeating ARM tests.
+
 ## Unreleased — Phase 8
 
 - Add validated content-addressed artwork originals, previews, thumbnails and provenance with offline fallback and manual priority overrides.

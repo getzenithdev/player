@@ -212,7 +212,9 @@ pub fn execute(storage: &StorageManager, action: LibraryAction) -> Result<Librar
             reconcile(storage, &mut doc, &mut warnings);
         }
         LibraryAction::RemoveLocation { path } => {
-            doc.locations.retain(|p| p != &path);
+            let canonical = fs::canonicalize(&path).unwrap_or_else(|_| PathBuf::from(&path));
+            doc.locations
+                .retain(|p| p != &path && Path::new(p) != canonical);
             doc.tracks.retain(|t| {
                 t.source.as_deref() != Some("local")
                     || t.local_path
@@ -612,7 +614,10 @@ fn write_metadata(path: &Path, edit: &MetadataEdit) -> Result<(), String> {
     let result = (|| -> Result<(), String> {
         file.save_to_path(&staged, WriteOptions::default())
             .map_err(|e| e.to_string())?;
-        File::open(&staged)
+        // Windows FlushFileBuffers requires a writable handle.
+        fs::OpenOptions::new()
+            .write(true)
+            .open(&staged)
             .and_then(|f| f.sync_all())
             .map_err(|e| e.to_string())?;
         if hash_file(path)? != original_hash {
@@ -641,11 +646,12 @@ fn write_metadata(path: &Path, edit: &MetadataEdit) -> Result<(), String> {
 pub fn record_play(storage: &StorageManager, path: &str) -> Result<(), String> {
     let _operation = storage.library_lock();
     let mut doc = load(storage)?;
-    if let Some(t) = doc
-        .tracks
-        .iter_mut()
-        .find(|t| t.local_path.as_deref() == Some(path))
-    {
+    let canonical = fs::canonicalize(path).unwrap_or_else(|_| PathBuf::from(path));
+    if let Some(t) = doc.tracks.iter_mut().find(|t| {
+        t.local_path
+            .as_deref()
+            .is_some_and(|p| Path::new(p) == canonical)
+    }) {
         t.play_count = t.play_count.saturating_add(1);
         t.last_played = Some(now());
         save(storage, &doc)?;
