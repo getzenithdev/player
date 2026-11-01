@@ -22,3 +22,21 @@ pub async fn playlist_action(
     .await
     .map_err(|e| e.to_string())?
 }
+
+#[tauri::command]
+pub async fn history_snapshot(
+    app: tauri::AppHandle,
+) -> Result<crate::session::HistoryDocument, String> {
+    tauri::async_runtime::spawn_blocking(move || {
+        let storage = app.state::<StorageManager>();
+        let _operation = storage.library_lock();
+        let mut doc = crate::session::load(&storage)?;
+        let library = playlists::library_tracks(&storage)?;
+        for visit in &mut doc.visits {
+            playlists::resolve_entries(std::slice::from_mut(&mut visit.entry), &library);
+        }
+        Ok(doc)
+    })
+    .await
+    .map_err(|e| e.to_string())?
+}

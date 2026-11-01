@@ -99,7 +99,14 @@ pub(crate) fn save(storage: &StorageManager, doc: &TracksDocument) -> Result<(),
     storage.rebuild_indexes();
     Ok(())
 }
-fn snapshot(doc: TracksDocument, warnings: Vec<String>) -> LibrarySnapshot {
+fn snapshot(
+    storage: &StorageManager,
+    mut doc: TracksDocument,
+    mut warnings: Vec<String>,
+) -> LibrarySnapshot {
+    if let Err(error) = crate::session::overlay(storage, &mut doc.tracks) {
+        warnings.push(error);
+    }
     let mut hash_groups: HashMap<String, Vec<String>> = HashMap::new();
     let mut candidates: HashMap<String, Vec<String>> = HashMap::new();
     for t in doc.tracks.iter().filter(|t| !t.missing) {
@@ -237,7 +244,7 @@ pub fn execute(storage: &StorageManager, action: LibraryAction) -> Result<Librar
     if doc != before {
         save(storage, &doc)?;
     }
-    Ok(snapshot(doc, warnings))
+    Ok(snapshot(storage, doc, warnings))
 }
 fn covered(path: &Path, locations: &[String]) -> bool {
     locations
@@ -543,6 +550,7 @@ fn write_metadata(path: &Path, edit: &MetadataEdit) -> Result<(), String> {
 }
 /// A play is counted after thirty seconds of actual playback in the audio
 /// worker, once per started track. Missing tracks retain their listening data.
+#[cfg(test)]
 pub fn record_play(storage: &StorageManager, path: &str) -> Result<(), String> {
     let _operation = storage.library_lock();
     let mut doc = load(storage)?;

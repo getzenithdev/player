@@ -73,6 +73,10 @@ pub struct TrackEntry {
     // Whole editable metadata overlay. Rescans preserve explicit internal edits.
     #[serde(default)]
     pub edited: bool,
+    #[serde(default)]
+    pub listened_ms: u64,
+    #[serde(default)]
+    pub last_position_ms: u64,
 }
 
 /// Payload of `library/tracks.json`.
