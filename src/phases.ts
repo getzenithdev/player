@@ -65,7 +65,7 @@ export const phases: Phase[] = [
     objective:
       "Importar, organizar y mantener actualizados los archivos musicales.",
     view: "library",
-    status: "Pendiente",
+    status: "En pruebas",
     checks: [
       "Importar una carpeta dos veces sin duplicar sus entradas.",
       "Detectar archivos agregados, modificados, movidos y eliminados.",

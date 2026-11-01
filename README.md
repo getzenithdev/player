@@ -2,7 +2,7 @@
 
 A local-first desktop music player built with Tauri 2, React, TypeScript, and Rust.
 
-The repository provides the application foundation, a minimal development interface, and local audio playback from phase 3. The library, lyrics, artwork, and external providers are planned in the [roadmap](docs/roadmap.md). The audio engine selection, format matrix, and manual verification steps are documented in [audio-engine.md](docs/audio-engine.md).
+The repository provides the application foundation, local audio playback, and a persistent local music library with import, monitoring, metadata editing, favorites, statistics, and duplicate reporting. Lyrics, external artwork providers, and cloud sources remain planned in the [roadmap](docs/roadmap.md). The audio engine selection, format matrix, and manual verification steps are documented in [audio-engine.md](docs/audio-engine.md).
 
 ## Development Interface
 
@@ -11,6 +11,10 @@ Navigate between the library, playlists, queue, lyrics, artwork, sources, equali
 In the desktop application, **Cola → Abrir archivos** loads local audio files into a temporary queue. Playback, pause, stop, seeking, volume, mute, repeat, shuffle, and output restart are connected to the Rust audio engine. The browser-only preview keeps playback controls disabled because Tauri commands are unavailable there.
 
 Navigation, temporary test playlists, equalizer controls, and review checkboxes work within the current session. The theme is the only preference persisted so far, in the desktop application. Pending native features have disabled controls, and manual review marks do not mark a phase as implemented. See the [interface design notes](docs/design.md).
+
+## Local Music Library
+
+**Biblioteca** supports importing files or multiple folders, searching songs and metadata, grouped views, favorites, history, and playback. Locations are reconciled every ten seconds or on demand. Metadata edits stay internal unless the user explicitly requests writing tags to the original; explicit writes retain a recovery copy. See [Music Library and Local Files](docs/music-library.md) for identity rules, limitations, and desktop acceptance steps.
 
 ## Local Storage
 
@@ -52,7 +56,7 @@ npm run tauri build
 
 `npm run build` compiles the frontend only. `npm run tauri build` builds the desktop application and local bundles. Signing and public releases are not configured yet.
 
-Vitest runs the frontend unit tests (currently the storage wrappers' browser fallback and size formatting). The `--passWithNoTests` flag remains explicit; an empty run is not evidence of feature coverage.
+Vitest runs frontend unit tests for storage browser fallbacks, size formatting, library search, grouping, and views. The `--passWithNoTests` flag remains explicit; an empty run is not evidence of feature coverage.
 
 GitHub Actions checks the frontend and compiles Windows x64, macOS Intel/Apple Silicon, and Linux x64. These build jobs do not establish compatibility with all operating system versions listed in the specification.
 
@@ -61,4 +65,5 @@ GitHub Actions checks the frontend and compiles Windows x64, macOS Intel/Apple S
 - [Product specifications](docs/specs.md)
 - [Environment and commands](docs/environment.md)
 - [Audio engine](docs/audio-engine.md)
+- [Music library and local files](docs/music-library.md)
 - [Development roadmap](docs/roadmap.md)

@@ -1,5 +1,7 @@
 mod audio;
 mod commands;
+mod library;
+mod library_commands;
 mod storage;
 
 use tauri::Manager;
@@ -17,9 +19,12 @@ pub fn run() {
             // The audio worker opens the output device in the background so a
             // missing or busy device never blocks application startup.
             app.manage(audio::AudioEngine::new(app.handle().clone()));
+            library_commands::start_monitor(app.handle().clone());
             Ok(())
         })
         .invoke_handler(tauri::generate_handler![
+            library_commands::library_action,
+            library_commands::library_artwork,
             commands::storage_status,
             commands::appearance_get,
             commands::appearance_save,

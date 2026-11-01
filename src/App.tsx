@@ -15,6 +15,7 @@ import {
   type StorageStatus,
 } from "./storage";
 import "./App.css";
+import { Library } from "./Library";
 
 const navigation: { view: View; label: string }[] = [
   { view: "library", label: "Biblioteca" },
@@ -191,8 +192,6 @@ function SettingRow({
 export default function App() {
   const [view, setView] = useState<View>("library");
   const [theme, setTheme] = useState("light");
-  const [libraryTab, setLibraryTab] = useState("Canciones");
-  const [search, setSearch] = useState("");
   const [settingsTab, setSettingsTab] = useState("Apariencia");
   const [selectedPhase, setSelectedPhase] = useState(2);
   const [reviewed, setReviewed] = useState<string[]>([]);
@@ -332,85 +331,7 @@ export default function App() {
   function renderContent() {
     switch (view) {
       case "library":
-        return (
-          <>
-            <div className="toolbar">
-              <label className="search-field">
-                <span className="sr-only">Buscar en la biblioteca</span>
-                <input
-                  type="search"
-                  placeholder="Buscar en la biblioteca"
-                  value={search}
-                  onChange={(event) => setSearch(event.target.value)}
-                />
-              </label>
-              <PendingButton phase={4}>Agregar música</PendingButton>
-            </div>
-            <div
-              className="tabs"
-              role="tablist"
-              aria-label="Vistas de biblioteca"
-            >
-              {[
-                "Canciones",
-                "Álbumes",
-                "Artistas",
-                "Favoritos",
-                "Historial",
-              ].map((tab) => (
-                <button
-                  key={tab}
-                  role="tab"
-                  id={`library-${tab}`}
-                  aria-selected={libraryTab === tab}
-                  tabIndex={libraryTab === tab ? 0 : -1}
-                  onKeyDown={navigateTabs}
-                  aria-controls="library-content"
-                  onClick={() => setLibraryTab(tab)}
-                >
-                  {tab}
-                </button>
-              ))}
-            </div>
-            <section
-              id="library-content"
-              role="tabpanel"
-              aria-labelledby={`library-${libraryTab}`}
-            >
-              <div className="list-heading">
-                <span>{libraryTab}</span>
-                <span>0 elementos</span>
-              </div>
-              {libraryTab === "Canciones" && (
-                <div className="track-columns" aria-hidden="true">
-                  <span>Título</span>
-                  <span>Artista</span>
-                  <span>Álbum</span>
-                  <span>Duración</span>
-                </div>
-              )}
-              <EmptyState
-                icon="library"
-                title={
-                  search
-                    ? `Sin resultados para “${search}”`
-                    : "Tu biblioteca empieza aquí"
-                }
-              >
-                La importación de música se conectará en la fase 4. Después
-                podrás consultar canciones, álbumes, artistas y sus metadatos.
-              </EmptyState>
-            </section>
-            <div className="module-note">
-              <span>
-                Importación y biblioteca: fase 4. Identidad y metadatos: fase 6.
-              </span>
-              <button className="text-button" onClick={() => openPhase(4)}>
-                Ver comprobaciones
-              </button>
-            </div>
-          </>
-        );
+        return <Library audio={audio} />;
       case "playlists":
         return (
           <>
@@ -742,15 +663,20 @@ export default function App() {
                     <strong>{source}</strong>
                     <span className="secondary">
                       {source === "Archivos locales"
-                        ? "Importación pendiente"
+                        ? "Biblioteca local disponible"
                         : "Sin conectar"}
                     </span>
                   </div>
-                  <PendingButton phase={source === "Archivos locales" ? 4 : 9}>
-                    {source === "Archivos locales"
-                      ? "Agregar carpeta"
-                      : "Conectar"}
-                  </PendingButton>
+                  {source === "Archivos locales" ? (
+                    <button
+                      className="button small"
+                      onClick={() => setView("library")}
+                    >
+                      Abrir biblioteca
+                    </button>
+                  ) : (
+                    <PendingButton phase={9}>Conectar</PendingButton>
+                  )}
                 </li>
               ))}
             </ul>

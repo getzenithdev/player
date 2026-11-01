@@ -19,7 +19,7 @@ use std::{
 
 use rodio::{Decoder, DeviceSinkBuilder, MixerDeviceSink, Player, Source};
 use serde::{Deserialize, Serialize};
-use tauri::{AppHandle, Emitter, State};
+use tauri::{AppHandle, Emitter, Manager, State};
 
 const STATE_EVENT: &str = "audio:state";
 const POSITION_EVENT: &str = "audio:position";
@@ -317,6 +317,9 @@ struct AudioWorker {
     last_position: Duration,
     stalled_ticks: u32,
     recoveries: u8,
+    listened: Duration,
+    listen_position: Duration,
+    counted: bool,
 }
 
 impl AudioWorker {
@@ -349,6 +352,9 @@ impl AudioWorker {
             last_position: Duration::ZERO,
             stalled_ticks: 0,
             recoveries: 0,
+            listened: Duration::ZERO,
+            listen_position: Duration::ZERO,
+            counted: false,
         }
     }
 
@@ -428,6 +434,20 @@ impl AudioWorker {
             .iter()
             .map(|path| TrackSummary::from_path(Path::new(path)))
             .collect();
+        if let Ok(library) = crate::library::execute(
+            &self.app.state::<crate::storage::StorageManager>(),
+            crate::library::LibraryAction::Snapshot,
+        ) {
+            for track in &mut self.queue {
+                if let Some(entry) = library
+                    .tracks
+                    .iter()
+                    .find(|t| t.local_path.as_deref() == Some(&track.path))
+                {
+                    track.title = entry.title.clone();
+                }
+            }
+        }
         self.current = None;
         self.clear_player();
         self.position = Duration::ZERO;
@@ -475,6 +495,9 @@ impl AudioWorker {
         }
 
         if start_at.is_none() {
+            self.listened = Duration::ZERO;
+            self.listen_position = Duration::ZERO;
+            self.counted = false;
             self.recoveries = 0;
         }
 
@@ -534,6 +557,7 @@ impl AudioWorker {
         self.channels = Some(info.channels);
         self.format = Some(format_label(Path::new(&path)));
         self.last_position = position;
+        self.listen_position = position;
         self.stalled_ticks = 0;
         self.status = if autoplay {
             PlaybackStatus::Playing
@@ -615,6 +639,7 @@ impl AudioWorker {
             Ok(()) => {
                 self.position = target;
                 self.last_position = target;
+                self.listen_position = target;
                 self.stalled_ticks = 0;
                 self.error = None;
             }
@@ -717,6 +742,29 @@ impl AudioWorker {
         };
 
         self.position = position;
+        let delta = position.saturating_sub(self.listen_position);
+        self.listen_position = position;
+        if self.status == PlaybackStatus::Playing && !paused && delta <= Duration::from_secs(1) {
+            self.listened += delta;
+            if !self.counted && self.listened >= Duration::from_secs(30) {
+                self.counted = true;
+                if let Some(track) = self.current.and_then(|i| self.queue.get(i)) {
+                    let path = track.path.clone();
+                    let app = self.app.clone();
+                    // Never make JSON persistence or a scan block audio output.
+                    tauri::async_runtime::spawn_blocking(move || {
+                        if crate::library::record_play(
+                            &app.state::<crate::storage::StorageManager>(),
+                            &path,
+                        )
+                        .is_ok()
+                        {
+                            let _ = app.emit("library:changed", ());
+                        }
+                    });
+                }
+            }
+        }
 
         if self.status != PlaybackStatus::Playing {
             return;

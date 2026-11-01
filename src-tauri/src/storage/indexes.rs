@@ -48,6 +48,31 @@ pub struct TrackEntry {
     pub artwork_id: Option<String>,
     #[serde(default)]
     pub lyrics_id: Option<String>,
+    #[serde(default)]
+    pub album_artist: Option<String>,
+    #[serde(default)]
+    pub comments: Option<String>,
+    #[serde(default)]
+    pub format: String,
+    #[serde(default)]
+    pub size: u64,
+    #[serde(default)]
+    pub modified_ns: u128,
+    #[serde(default)]
+    pub hash: String,
+    #[serde(default)]
+    pub added_at: u64,
+    #[serde(default)]
+    pub missing: bool,
+    #[serde(default)]
+    pub favorite: bool,
+    #[serde(default)]
+    pub play_count: u64,
+    #[serde(default)]
+    pub last_played: Option<u64>,
+    // Whole editable metadata overlay. Rescans preserve explicit internal edits.
+    #[serde(default)]
+    pub edited: bool,
 }
 
 /// Payload of `library/tracks.json`.
@@ -55,6 +80,8 @@ pub struct TrackEntry {
 pub struct TracksDocument {
     #[serde(default)]
     pub tracks: Vec<TrackEntry>,
+    #[serde(default)]
+    pub locations: Vec<String>,
 }
 
 /// Search result exposed to the interface.

@@ -164,6 +164,8 @@ Evaluate Kira, Symphonia, and CPAL, with Rodio as an alternative, distinguishing
 
 **Acceptance and testing:** import a location twice without duplicating its entries; reconcile moved or deleted files and continue past unreadable files. Verify that internal edits do not change original files without an explicit request.
 
+**Implementation notes:** phase 4 is implemented in `src-tauri/src/library.rs`, its native command/monitor adapter, and `src/Library.tsx`. It includes persistent locations, content-probed metadata/artwork, polling reconciliation, stable IDs across unambiguous hash-confirmed moves, duplicate reporting, grouped views, favorites/statistics, and an internal metadata editor with explicit staged tag writing. See [music-library.md](music-library.md) for the storage contract, tests, limitations, and manual platform acceptance checklist. The interface tracks this as "En pruebas" until those installed-build checks are recorded.
+
 ## Phase 5. Playlists, Queue, and History
 
 **Objective:** manage playlists and an independent queue with session restoration.
