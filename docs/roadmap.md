@@ -183,6 +183,8 @@ Evaluate Kira, Symphonia, and CPAL, with Rodio as an alternative, distinguishing
 
 **Acceptance and testing:** export and import a playlist while preserving order and compatible paths; restore a session and verify that queue changes do not alter saved playlists.
 
+**Implementation notes:** phase 5 is implemented by the playlist manager/interchange module, audio-owned queue operations, and ordered session/history persistence. The interface includes persistent playlists, queue editing and save/restore, library-to-list/queue actions, and detailed listening history. See [playlists-queue.md](playlists-queue.md) for storage contracts, tests, PLS evaluation, counting/missing-file policies, and manual desktop acceptance. The phase is tracked as "En pruebas" until installed-platform acceptance is recorded.
+
 ## Phase 6. Metadata Engine
 
 **Objective:** represent tracks from different sources with a stable internal identity.

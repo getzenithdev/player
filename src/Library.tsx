@@ -15,6 +15,8 @@ import {
   type MetadataEdit,
 } from "./library";
 import "./Library.css";
+import { entryFromTrack, usePlaylists } from "./playlists";
+import "./Playlists.css";
 
 function Cover({ id }: { id: string | null }) {
   const [url, setUrl] = useState<string | null>(null);
@@ -39,6 +41,7 @@ function Cover({ id }: { id: string | null }) {
   );
 }
 export function Library({ audio }: { audio: AudioController }) {
+  const lists = usePlaylists();
   const [library, setLibrary] = useState(emptyLibrary);
   const [view, setView] = useState<LibraryView>("Canciones");
   const [query, setQuery] = useState("");
@@ -178,9 +181,9 @@ export function Library({ audio }: { audio: AudioController }) {
         </p>
       )}
       {busy && <p role="status">Procesando biblioteca…</p>}
-      {error && (
+      {(error || lists.error) && (
         <p role="alert" className="library-error">
-          {error}
+          {error || lists.error}
         </p>
       )}
       {!!warnings.length && (
@@ -262,6 +265,58 @@ export function Library({ audio }: { audio: AudioController }) {
                       : ""}
                   </small>
                 </button>
+                <div className="library-actions">
+                  <button
+                    className="button small"
+                    disabled={t.missing || !t.local_path}
+                    onClick={() =>
+                      void audio.queueAction({
+                        kind: "append",
+                        paths: [t.local_path!],
+                        after_current: true,
+                      })
+                    }
+                  >
+                    Reproducir después
+                  </button>
+                  <button
+                    className="button small"
+                    disabled={t.missing || !t.local_path}
+                    onClick={() =>
+                      void audio.queueAction({
+                        kind: "append",
+                        paths: [t.local_path!],
+                        after_current: false,
+                      })
+                    }
+                  >
+                    Añadir al final
+                  </button>
+                  <label>
+                    <span className="sr-only">
+                      Añadir {t.title} a una lista
+                    </span>
+                    <select
+                      value=""
+                      disabled={lists.busy || !lists.playlists.length}
+                      onChange={(e) => {
+                        if (e.target.value)
+                          void lists.run({
+                            kind: "add",
+                            id: e.target.value,
+                            entries: [entryFromTrack(t)],
+                          });
+                      }}
+                    >
+                      <option value="">Añadir a lista…</option>
+                      {lists.playlists.map((p) => (
+                        <option key={p.id} value={p.id}>
+                          {p.name}
+                        </option>
+                      ))}
+                    </select>
+                  </label>
+                </div>
                 <span className="library-duration">
                   {t.duration === null
                     ? "—"

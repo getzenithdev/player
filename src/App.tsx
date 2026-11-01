@@ -16,11 +16,15 @@ import {
 } from "./storage";
 import "./App.css";
 import { Library } from "./Library";
+import { Playlists } from "./Playlists";
+import { QueuePanel } from "./QueuePanel";
+import { ListeningHistory } from "./ListeningHistory";
 
 const navigation: { view: View; label: string }[] = [
   { view: "library", label: "Biblioteca" },
   { view: "playlists", label: "Listas" },
   { view: "queue", label: "Cola" },
+  { view: "history", label: "Historial" },
   { view: "lyrics", label: "Letras" },
   { view: "artwork", label: "Portadas" },
   { view: "sources", label: "Fuentes" },
@@ -32,6 +36,7 @@ const navigation: { view: View; label: string }[] = [
 const pagePhases: Record<View, number[]> = {
   library: [4, 6],
   playlists: [5],
+  history: [5],
   queue: [3, 5],
   lyrics: [7],
   artwork: [8],
@@ -88,15 +93,6 @@ function repeatLabel(mode: RepeatMode) {
   return "Sin repetición";
 }
 
-function statusLabel(status: string) {
-  if (status === "loading") return "Cargando";
-  if (status === "playing") return "Reproduciendo";
-  if (status === "paused") return "En pausa";
-  if (status === "stopped") return "Detenido";
-  if (status === "error") return "Error";
-  return "";
-}
-
 function countLabel(count: number, singular: string, plural: string) {
   return `${count} ${count === 1 ? singular : plural}`;
 }
@@ -149,26 +145,6 @@ function PendingButton({
   );
 }
 
-function EmptyState({
-  icon,
-  title,
-  children,
-}: {
-  icon: View;
-  title: string;
-  children: ReactNode;
-}) {
-  return (
-    <div className="empty-state">
-      <span className="empty-icon">
-        <Icon name={icon} size={30} />
-      </span>
-      <h2>{title}</h2>
-      <p>{children}</p>
-    </div>
-  );
-}
-
 function SettingRow({
   title,
   description,
@@ -195,11 +171,6 @@ export default function App() {
   const [settingsTab, setSettingsTab] = useState("Apariencia");
   const [selectedPhase, setSelectedPhase] = useState(2);
   const [reviewed, setReviewed] = useState<string[]>([]);
-  const [playlistName, setPlaylistName] = useState("");
-  const [playlists, setPlaylists] = useState<{ id: number; name: string }[]>(
-    [],
-  );
-  const [nextPlaylistId, setNextPlaylistId] = useState(1);
   const [bands, setBands] = useState<number[]>(Array(10).fill(0));
   const [lyricsMode, setLyricsMode] = useState("Normal");
   const [pickingFiles, setPickingFiles] = useState(false);
@@ -333,214 +304,11 @@ export default function App() {
       case "library":
         return <Library audio={audio} />;
       case "playlists":
-        return (
-          <>
-            <p className="page-description">
-              Organiza tu música en listas independientes de la cola.
-            </p>
-            <form
-              className="toolbar"
-              onSubmit={(event) => {
-                event.preventDefault();
-                const name = playlistName.trim();
-                if (!name) return;
-                setPlaylists((current) => [
-                  ...current,
-                  { id: nextPlaylistId, name },
-                ]);
-                setNextPlaylistId((current) => current + 1);
-                setPlaylistName("");
-              }}
-            >
-              <label className="search-field">
-                <span className="sr-only">Nombre de la nueva lista</span>
-                <input
-                  placeholder="Nombre de la lista"
-                  value={playlistName}
-                  maxLength={64}
-                  onChange={(event) => setPlaylistName(event.target.value)}
-                  required
-                />
-              </label>
-              <button
-                className="button primary"
-                disabled={!playlistName.trim()}
-              >
-                Crear lista de prueba
-              </button>
-            </form>
-            <p className="inline-note">
-              Las listas de prueba se conservan solo mientras esta ventana esté
-              abierta. Guardar e importar canciones está pendiente de la fase 5.
-            </p>
-            {playlists.length ? (
-              <ul className="plain-list">
-                {playlists.map((item) => (
-                  <li key={item.id}>
-                    <span className="row-icon">
-                      <Icon name="playlists" />
-                    </span>
-                    <div className="grow">
-                      <strong>{item.name}</strong>
-                      <span className="secondary">0 canciones</span>
-                    </div>
-                    <button
-                      className="text-button"
-                      aria-label={`Eliminar lista ${item.name}`}
-                      onClick={() =>
-                        setPlaylists((current) =>
-                          current.filter((entry) => entry.id !== item.id),
-                        )
-                      }
-                    >
-                      Eliminar
-                    </button>
-                  </li>
-                ))}
-              </ul>
-            ) : (
-              <EmptyState icon="playlists" title="Todavía no hay listas">
-                Crea una lista de prueba para revisar esta pantalla. La
-                persistencia y los formatos M3U y M3U8 se implementarán más
-                adelante.
-              </EmptyState>
-            )}
-          </>
-        );
-      case "queue": {
-        const totalDuration = playback.queue.reduce(
-          (sum, item) => sum + (item.durationMs ?? 0),
-          0,
-        );
-        return (
-          <>
-            <div className="toolbar">
-              <p className="page-description">
-                {hasQueue
-                  ? `${playback.queue.length} ${
-                      playback.queue.length === 1 ? "canción" : "canciones"
-                    } · ${formatTime(totalDuration)}`
-                  : "0 canciones en la cola"}
-              </p>
-              <div className="button-group">
-                <button
-                  className="button primary"
-                  disabled={!audio.available || pickingFiles}
-                  onClick={() => void openAudioFiles(true)}
-                >
-                  {pickingFiles ? "Abriendo…" : "Abrir archivos"}
-                </button>
-                <button
-                  className="button"
-                  disabled={!audio.available || !hasQueue}
-                  onClick={() => void audio.clearQueue()}
-                >
-                  Vaciar
-                </button>
-              </div>
-            </div>
-            {hasQueue ? (
-              <>
-                <div className="toolbar queue-toolbar">
-                  <div className="button-group">
-                    <button
-                      className={`button ${playback.shuffle ? "active" : ""}`}
-                      aria-pressed={playback.shuffle}
-                      disabled={!audio.available}
-                      onClick={() => void audio.setShuffle(!playback.shuffle)}
-                    >
-                      <Icon name="shuffle" size={16} />
-                      Aleatorio
-                    </button>
-                    <button
-                      className="button"
-                      disabled={!audio.available}
-                      onClick={cycleRepeat}
-                    >
-                      <Icon
-                        name={
-                          playback.repeat === "one" ? "repeatOne" : "repeat"
-                        }
-                        size={16}
-                      />
-                      {repeatLabel(playback.repeat)}
-                    </button>
-                    <button
-                      className="button"
-                      disabled={!audio.available}
-                      onClick={() => void audio.restartOutput()}
-                    >
-                      Reiniciar salida
-                    </button>
-                  </div>
-                </div>
-                <ul className="plain-list queue-list">
-                  {playback.queue.map((item, index) => (
-                    <li
-                      key={`${item.path}-${index}`}
-                      className={
-                        playback.currentIndex === index ? "current" : ""
-                      }
-                    >
-                      <span className="queue-index">
-                        {playback.currentIndex === index ? (
-                          <Icon name="play" size={14} />
-                        ) : (
-                          String(index + 1).padStart(2, "0")
-                        )}
-                      </span>
-                      <button
-                        className="queue-track"
-                        disabled={!audio.available}
-                        onClick={() => void audio.playIndex(index)}
-                      >
-                        <strong>{item.title}</strong>
-                        <span className="secondary">
-                          {item.format} · {formatTime(item.durationMs)}
-                        </span>
-                      </button>
-                      {playback.currentIndex === index && (
-                        <span className="status">
-                          {statusLabel(playback.status)}
-                        </span>
-                      )}
-                    </li>
-                  ))}
-                </ul>
-                <div className="module-note">
-                  <span>
-                    {audio.capabilities
-                      ? `Motor: ${audio.capabilities.decoder} · salida ${audio.capabilities.output}.`
-                      : "Motor de audio local."}{" "}
-                    La cola es temporal; su persistencia llega en la fase 5.
-                  </span>
-                  <button className="text-button" onClick={() => openPhase(3)}>
-                    Ver comprobaciones
-                  </button>
-                </div>
-              </>
-            ) : (
-              <EmptyState icon="queue" title="No hay canciones en espera">
-                Abre archivos de audio para probar reproducción, pausa,
-                búsqueda, volumen y cambio de pista. La biblioteca y la cola
-                persistente llegan en las fases 4 y 5.
-              </EmptyState>
-            )}
-            {!audio.available && (
-              <p className="inline-note">
-                La reproducción requiere la aplicación de escritorio; la vista
-                de navegador no expone el motor de audio.
-              </p>
-            )}
-            {audio.error && (
-              <p className="inline-note error-note">{audio.error}</p>
-            )}
-            {playback.error && (
-              <p className="inline-note error-note">{playback.error}</p>
-            )}
-          </>
-        );
-      }
+        return <Playlists audio={audio} />;
+      case "queue":
+        return <QueuePanel audio={audio} />;
+      case "history":
+        return <ListeningHistory audio={audio} />;
       case "lyrics":
         return (
           <>
@@ -1226,7 +994,7 @@ export default function App() {
             </button>
             <button
               className="play-button"
-              disabled={!audio.available}
+              disabled={!audio.available || pickingFiles}
               aria-label={isPlaying ? "Pausar" : "Reproducir"}
               onClick={() => {
                 if (!hasQueue) void openAudioFiles(true);

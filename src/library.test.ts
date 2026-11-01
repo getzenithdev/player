@@ -75,3 +75,31 @@ describe("library views", () => {
     ).toBe("C:\\Music");
   });
 });
+
+it("shows short listening visits in history without treating them as counted plays", () => {
+  const t = {
+    id: "short",
+    title: "Short",
+    artist: null,
+    album: null,
+    album_artist: null,
+    genre: null,
+    year: null,
+    track_number: null,
+    disc_number: null,
+    comments: null,
+    local_path: "/music/short.wav",
+    duration: 10,
+    artwork_id: null,
+    format: "WAV",
+    size: 10,
+    added_at: 1,
+    missing: false,
+    favorite: false,
+    play_count: 0,
+    last_played: 123,
+  } satisfies LibraryTrack;
+  const library = { ...emptyLibrary, tracks: [t] };
+  expect(selectTracks(library, "Historial", "")).toHaveLength(1);
+  expect(selectTracks(library, "Más escuchadas", "")).toHaveLength(0);
+});

@@ -8,13 +8,17 @@ The repository provides the application foundation, local audio playback, and a 
 
 Navigate between the library, playlists, queue, lyrics, artwork, sources, equalizer, and settings. The **Fases** screen exposes all 16 roadmap phases with summarized manual acceptance checklists and shortcuts to their modules.
 
-In the desktop application, **Cola → Abrir archivos** loads local audio files into a temporary queue. Playback, pause, stop, seeking, volume, mute, repeat, shuffle, and output restart are connected to the Rust audio engine. The browser-only preview keeps playback controls disabled because Tauri commands are unavailable there.
+In the desktop application, **Cola → Abrir y reemplazar cola** loads local audio files into an independent persistent queue. Playback, pause, stop, seeking, volume, mute, repeat, shuffle, and output restart are connected to the Rust audio engine. The browser-only preview keeps playback controls disabled because Tauri commands are unavailable there.
 
-Navigation, temporary test playlists, equalizer controls, and review checkboxes work within the current session. The theme is the only preference persisted so far, in the desktop application. Pending native features have disabled controls, and manual review marks do not mark a phase as implemented. See the [interface design notes](docs/design.md).
+Playlists, queue sessions, listening history, and the theme persist in the desktop application. Equalizer preview controls and manual review checkboxes remain session-only. Pending native features have disabled controls, and manual review marks do not mark a phase as implemented. See the [interface design notes](docs/design.md).
 
 ## Local Music Library
 
 **Biblioteca** supports importing files or multiple folders, searching songs and metadata, grouped views, favorites, history, and playback. Locations are reconciled every ten seconds or on demand. Metadata edits stay internal unless the user explicitly requests writing tags to the original; explicit writes retain a recovery copy. See [Music Library and Local Files](docs/music-library.md) for identity rules, limitations, and desktop acceptance steps.
+
+## Playlists, Queue, and History
+
+**Listas** supports persistent playlist editing and M3U/M3U8/JSON interchange. **Cola** supports appending, play-next insertion, reordering, removal, an explicit saved copy, and automatic session restoration without autoplay. **Historial** records credited listening time and play counts, including files outside the library. See [Phase 5](docs/playlists-queue.md) for data contracts, counting rules, and installed-build acceptance.
 
 ## Local Storage
 
@@ -56,7 +60,7 @@ npm run tauri build
 
 `npm run build` compiles the frontend only. `npm run tauri build` builds the desktop application and local bundles. Signing and public releases are not configured yet.
 
-Vitest runs frontend unit tests for storage browser fallbacks, size formatting, library search, grouping, and views. The `--passWithNoTests` flag remains explicit; an empty run is not evidence of feature coverage.
+Vitest runs frontend unit tests for storage browser fallbacks, size formatting, library search, grouping, views, playlist references, and stable queue reorder commands. The `--passWithNoTests` flag remains explicit; an empty run is not evidence of feature coverage.
 
 GitHub Actions checks the frontend and compiles Windows x64, macOS Intel/Apple Silicon, and Linux x64. These build jobs do not establish compatibility with all operating system versions listed in the specification.
 
@@ -66,4 +70,5 @@ GitHub Actions checks the frontend and compiles Windows x64, macOS Intel/Apple S
 - [Environment and commands](docs/environment.md)
 - [Audio engine](docs/audio-engine.md)
 - [Music library and local files](docs/music-library.md)
+- [Playlists, queue, and history](docs/playlists-queue.md)
 - [Development roadmap](docs/roadmap.md)

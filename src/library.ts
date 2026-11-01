@@ -23,6 +23,8 @@ export interface LibraryTrack extends MetadataEdit {
   favorite: boolean;
   play_count: number;
   last_played: number | null;
+  listened_ms?: number;
+  last_position_ms?: number;
 }
 export interface LibrarySnapshot {
   tracks: LibraryTrack[];
@@ -83,7 +85,9 @@ export function selectTracks(
     ),
   );
   if (view === "Favoritos") tracks = tracks.filter((t) => t.favorite);
-  if (view === "Historial" || view === "Más escuchadas")
+  if (view === "Historial")
+    tracks = tracks.filter((t) => t.last_played !== null || t.play_count > 0);
+  if (view === "Más escuchadas")
     tracks = tracks.filter((t) => t.play_count > 0);
   if (view === "Duplicados") {
     const ids = new Set(library.duplicates.flatMap((g) => g.ids));

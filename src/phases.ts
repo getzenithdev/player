@@ -2,6 +2,7 @@ export type View =
   | "library"
   | "playlists"
   | "queue"
+  | "history"
   | "lyrics"
   | "artwork"
   | "sources"
@@ -78,7 +79,7 @@ export const phases: Phase[] = [
     objective:
       "Organizar listas y una cola independiente que se pueda restaurar.",
     view: "playlists",
-    status: "Pendiente",
+    status: "En pruebas",
     checks: [
       "Crear, editar, reordenar e intercambiar listas.",
       "Modificar la cola sin cambiar la lista de origen.",
