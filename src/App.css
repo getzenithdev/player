@@ -387,3 +387,91 @@ input[type="checkbox"] {
     transition: none !important;
   }
 }
+/* In-app preference: the system setting is a floor, never a ceiling. */
+.workspace[data-reduced-motion="true"] *,
+.workspace[data-reduced-motion="true"] *::before,
+.workspace[data-reduced-motion="true"] *::after {
+  scroll-behavior: auto !important;
+  animation: none !important;
+  transition: none !important;
+}
+.workspace[data-high-contrast="true"] {
+  --line: #f6f0fa70;
+  --muted: #e7dcf0;
+  --hover: #ffffff24;
+  --accent: #f1dcff;
+  --accent-soft: #f1dcff3d;
+  --button-text: #14091f;
+}
+.workspace[data-high-contrast="true"][data-theme="light"] {
+  --line: #2a193766;
+  --muted: #4d3a5c;
+  --hover: #6b438412;
+  --accent: #67387f;
+  --accent-soft: #67387f26;
+  --button-text: #fff;
+}
+@media (prefers-color-scheme: light) {
+  .workspace[data-high-contrast="true"][data-theme="system"] {
+    --line: #2a193766;
+    --muted: #4d3a5c;
+    --hover: #6b438412;
+    --accent: #67387f;
+    --accent-soft: #67387f26;
+    --button-text: #fff;
+  }
+}
+.workspace[data-high-contrast="true"] :focus-visible {
+  outline-width: 3px;
+  outline-offset: 3px;
+}
+@media (forced-colors: active) {
+  :focus-visible {
+    outline: 2px solid Highlight;
+  }
+}
+.toggle-control {
+  display: inline-flex;
+  align-items: center;
+  gap: 9px;
+  min-height: 32px;
+}
+.toggle-control span {
+  color: var(--muted);
+  font-size: 12px;
+}
+.shortcut-help {
+  margin-top: 22px;
+  padding: 18px 20px;
+  border: 1px solid var(--line);
+  border-radius: 14px;
+  background: var(--surface);
+}
+.shortcut-help h3 {
+  margin-bottom: 12px;
+}
+.shortcut-list {
+  display: flex;
+  flex-direction: column;
+  gap: 9px;
+  padding: 0;
+  margin: 0;
+  list-style: none;
+  color: var(--muted);
+  font-size: 13px;
+}
+.shortcut-list li {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 6px;
+}
+.shortcut-list kbd {
+  padding: 2px 7px;
+  border: 1px solid var(--line);
+  border-radius: 6px;
+  background: var(--hover);
+  color: var(--text);
+  font-family: inherit;
+  font-size: 12px;
+}

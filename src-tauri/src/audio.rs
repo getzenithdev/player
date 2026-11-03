@@ -14,7 +14,7 @@ use std::{
         mpsc::{self, Receiver, RecvTimeoutError, Sender},
     },
     thread,
-    time::{Duration, SystemTime, UNIX_EPOCH},
+    time::{Duration, Instant, SystemTime, UNIX_EPOCH},
 };
 
 use rodio::{Decoder, DeviceSinkBuilder, MixerDeviceSink, Player, Source};
@@ -393,14 +393,35 @@ impl AudioWorker {
         }
         self.publish();
 
+        let mut last_wake = Instant::now();
         loop {
             match self.commands.recv_timeout(TICK) {
                 Err(RecvTimeoutError::Disconnected) => break,
                 Ok(command) => self.handle(command),
                 Err(RecvTimeoutError::Timeout) => {}
             }
+            // A suspended system does not deliver a portable resume event, so
+            // a long gap between ticks is the only reliable signal. Rebuilding
+            // the output stream recovers devices that were reset by sleep.
+            let elapsed = last_wake.elapsed();
+            last_wake = Instant::now();
+            if crate::native::resumed_after_suspend(elapsed) {
+                self.recover_from_suspend();
+            }
             self.tick();
         }
+    }
+
+    fn recover_from_suspend(&mut self) {
+        if self.player.is_none()
+            || !matches!(
+                self.status,
+                PlaybackStatus::Playing | PlaybackStatus::Paused
+            )
+        {
+            return;
+        }
+        self.restart_output();
     }
 
     fn handle(&mut self, command: AudioCommand) {
@@ -977,8 +998,15 @@ impl AudioWorker {
         }
         if self.last_checkpoint.elapsed() >= Duration::from_secs(5) {
             self.persist(false);
-            self.last_checkpoint = std::time::Instant::now();
+            self.last_checkpoint = Instant::now();
         }
+
+        crate::native::sync_progress(
+            &self.app,
+            &self.status,
+            duration_ms(position),
+            self.duration.map(duration_ms),
+        );
 
         if self.status != PlaybackStatus::Playing {
             return;
@@ -1101,7 +1129,8 @@ impl AudioWorker {
             *shared = snapshot.clone();
         }
 
-        let _ = self.app.emit(STATE_EVENT, snapshot);
+        let _ = self.app.emit(STATE_EVENT, snapshot.clone());
+        crate::native::sync_snapshot(&self.app, &snapshot);
     }
 }
 

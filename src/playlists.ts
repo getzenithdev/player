@@ -7,6 +7,9 @@ export interface MediaEntry {
   trackId: string | null;
   path: string;
   title: string;
+  /** Optional metadata used by OS media controls and notifications. */
+  artist: string | null;
+  album: string | null;
   format: string;
   durationMs: number | null;
   available: boolean;
@@ -50,6 +53,8 @@ export function entryFromTrack(t: LibraryTrack): MediaEntry {
     trackId: t.id,
     path: t.local_path ?? "",
     title: t.title,
+    artist: t.artist,
+    album: t.album,
     format: t.format,
     durationMs: t.duration === null ? null : t.duration * 1000,
     available: !t.missing,
@@ -61,6 +66,8 @@ export function entryFromPath(path: string): MediaEntry {
     trackId: null,
     path,
     title: path.split(/[\\/]/).pop() ?? path,
+    artist: null,
+    album: null,
     format: "",
     durationMs: null,
     available: true,

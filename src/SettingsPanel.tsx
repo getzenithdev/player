@@ -1,6 +1,12 @@
 import { useEffect, useState, type ReactNode } from "react";
 import type { AudioController } from "./audio";
 import {
+  defaultIntegrationSettings,
+  testNotification,
+  type IntegrationSettings,
+  type IntegrationSnapshot,
+} from "./native";
+import {
   createBackup,
   clearCache,
   exportData,
@@ -30,16 +36,46 @@ function Setting({
     </div>
   );
 }
+function Toggle({
+  label,
+  checked,
+  disabled,
+  onChange,
+}: {
+  label: string;
+  checked: boolean;
+  disabled: boolean;
+  onChange: (checked: boolean) => void;
+}) {
+  return (
+    <label className="toggle-control">
+      <input
+        type="checkbox"
+        aria-label={label}
+        checked={checked}
+        disabled={disabled}
+        onChange={(event) => onChange(event.target.checked)}
+      />
+      <span>{checked ? "Activado" : "Desactivado"}</span>
+    </label>
+  );
+}
 export function Settings({
   theme,
   onTheme,
   audio,
   onSources,
+  integration = defaultIntegrationSettings,
+  integrationSnapshot = null,
+  onIntegration,
 }: {
   theme: string;
   onTheme: (theme: string) => void;
   audio: AudioController;
   onSources: () => void;
+  integration?: IntegrationSettings;
+  integrationSnapshot?: IntegrationSnapshot | null;
+  onIntegration: (settings: IntegrationSettings) => void;
 }) {
   const [tab, setTab] = useState("Apariencia");
   const [status, setStatus] = useState<StorageStatus | null>(null);
@@ -73,7 +109,14 @@ export function Settings({
       setBusy(false);
     }
   }
-  const tabs = ["Apariencia", "Biblioteca y datos", "Audio", "Privacidad"];
+  const tabs = [
+    "Apariencia",
+    "Sistema",
+    "Accesibilidad",
+    "Biblioteca y datos",
+    "Audio",
+    "Privacidad",
+  ];
   return (
     <section className="settings-screen">
       <div
@@ -149,6 +192,194 @@ export function Settings({
             <Setting title="Idioma" description="">
               <span className="status">Español</span>
             </Setting>
+          </>
+        )}
+        {tab === "Sistema" && (
+          <>
+            <Setting
+              title="Controles multimedia"
+              description="Reproduce, pausa y cambia de pista desde los controles del sistema (SMTC, MPRIS o Now Playing)."
+            >
+              <Toggle
+                label="Controles multimedia del sistema"
+                checked={integration.mediaControls}
+                disabled={!native}
+                onChange={(value) =>
+                  onIntegration({ ...integration, mediaControls: value })
+                }
+              />
+            </Setting>
+            <Setting
+              title="Teclas multimedia"
+              description="Reproducir, pausar, anterior, siguiente y detener desde el teclado, incluso con la ventana oculta."
+            >
+              <Toggle
+                label="Teclas multimedia globales"
+                checked={integration.globalShortcuts}
+                disabled={!native}
+                onChange={(value) =>
+                  onIntegration({ ...integration, globalShortcuts: value })
+                }
+              />
+            </Setting>
+            <Setting
+              title="Notificaciones"
+              description="Avisa del cambio de pista cuando la ventana no tiene el foco."
+            >
+              <div className="button-group">
+                <Toggle
+                  label="Notificaciones de pista"
+                  checked={integration.notifications}
+                  disabled={!native}
+                  onChange={(value) =>
+                    onIntegration({ ...integration, notifications: value })
+                  }
+                />
+                <button
+                  className="button"
+                  disabled={!native || busy || !integration.notifications}
+                  onClick={() =>
+                    void run(async () => {
+                      const sent = await testNotification();
+                      return sent
+                        ? "Notificación de prueba enviada."
+                        : "Las notificaciones requieren la aplicación de escritorio.";
+                    })
+                  }
+                >
+                  Probar
+                </button>
+              </div>
+            </Setting>
+            <Setting
+              title="Bandeja del sistema"
+              description="Mantiene un icono con acciones de reproducción y acceso a la ventana."
+            >
+              <Toggle
+                label="Icono en la bandeja del sistema"
+                checked={integration.tray}
+                disabled={!native}
+                onChange={(value) =>
+                  onIntegration({ ...integration, tray: value })
+                }
+              />
+            </Setting>
+            <Setting
+              title="Cerrar a la bandeja"
+              description="Cerrar la ventana mantiene la música sonando hasta salir desde la bandeja."
+            >
+              <Toggle
+                label="Cerrar la ventana a la bandeja"
+                checked={integration.closeToTray}
+                disabled={!native || !integration.tray}
+                onChange={(value) =>
+                  onIntegration({ ...integration, closeToTray: value })
+                }
+              />
+            </Setting>
+            <Setting
+              title="Inicio automático"
+              description="Abre Zenith al iniciar sesión, sin interrumpir el escritorio."
+            >
+              <Toggle
+                label="Iniciar al encender el equipo"
+                checked={integration.autostart}
+                disabled={!native || !integrationSnapshot?.autostartSupported}
+                onChange={(value) =>
+                  onIntegration({ ...integration, autostart: value })
+                }
+              />
+            </Setting>
+            <Setting
+              title="Estado de la integración"
+              description={`Plataforma: ${integrationSnapshot?.platform ?? "vista previa del navegador"}.`}
+            >
+              <span className="status">
+                {integrationSnapshot
+                  ? [
+                      integrationSnapshot.mediaControlsActive && "Controles",
+                      integrationSnapshot.trayActive && "Bandeja",
+                      integrationSnapshot.shortcutsActive && "Atajos",
+                    ]
+                      .filter(Boolean)
+                      .join(" · ") || "Ninguna integración activa"
+                  : native
+                    ? "Cargando…"
+                    : "Aplicación de escritorio"}
+              </span>
+            </Setting>
+            {integrationSnapshot?.notices.map((item, index) => (
+              <p className="inline-note" key={`${item}-${index}`}>
+                {item}
+              </p>
+            ))}
+          </>
+        )}
+        {tab === "Accesibilidad" && (
+          <>
+            <Setting
+              title="Movimiento reducido"
+              description="Desactiva animaciones y transiciones aunque el sistema no lo indique."
+            >
+              <Toggle
+                label="Reducir el movimiento de la interfaz"
+                checked={integration.reducedMotion}
+                disabled={!native}
+                onChange={(value) =>
+                  onIntegration({ ...integration, reducedMotion: value })
+                }
+              />
+            </Setting>
+            <Setting
+              title="Alto contraste"
+              description="Refuerza bordes, texto y foco para pantallas con poca visibilidad."
+            >
+              <Toggle
+                label="Activar el alto contraste"
+                checked={integration.highContrast}
+                disabled={!native}
+                onChange={(value) =>
+                  onIntegration({ ...integration, highContrast: value })
+                }
+              />
+            </Setting>
+            <Setting
+              title="Lectores de pantalla"
+              description="Los cambios de pista y los avisos se anuncian sin mover el foco."
+            >
+              <span className="status">Región de estado activa</span>
+            </Setting>
+            <Setting
+              title="Escalado y zoom"
+              description="La interfaz respeta la escala del sistema y el zoom del motor web."
+            >
+              <span className="status">Automático</span>
+            </Setting>
+            <div className="shortcut-help">
+              <h3>Atajos de teclado</h3>
+              <ul className="shortcut-list">
+                <li>
+                  <kbd>Espacio</kbd> Reproducir o pausar
+                </li>
+                <li>
+                  <kbd>←</kbd> <kbd>→</kbd> Retroceder o avanzar 5 segundos
+                </li>
+                <li>
+                  <kbd>Ctrl</kbd> + <kbd>←</kbd> / <kbd>→</kbd> Pista anterior o
+                  siguiente
+                </li>
+                <li>
+                  <kbd>M</kbd> Silenciar o restaurar el sonido
+                </li>
+                <li>
+                  <kbd>Ctrl</kbd> + <kbd>K</kbd> Buscar en la biblioteca
+                </li>
+              </ul>
+              <p className="inline-note">
+                Los campos de texto y los controles con foco conservan sus
+                propias teclas.
+              </p>
+            </div>
           </>
         )}
         {tab === "Biblioteca y datos" && (

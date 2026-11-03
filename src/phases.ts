@@ -159,7 +159,7 @@ export const phases: Phase[] = [
     name: "Integración nativa",
     objective: "Integrar controles del sistema y una experiencia accesible.",
     view: "settings",
-    status: "Pendiente",
+    status: "En pruebas",
     checks: [
       "Controlar la reproducción mediante las teclas y controles del sistema.",
       "Verificar notificaciones, bandeja o Dock según la plataforma.",

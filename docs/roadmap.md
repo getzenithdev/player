@@ -337,6 +337,8 @@ Include screen reader support, contrast, scaling, visible focus, keyboard naviga
 
 **Acceptance and testing:** control playback from the operating system, suspend/resume, and use the main flows with a keyboard. Verify accessibility and close/tray behavior on each target platform.
 
+**Implementation notes:** phase 11 is implemented in `src-tauri/src/native.rs` with `souvlaki` media controls, Tauri notification/global-shortcut/autostart plugins, a tray icon, close-to-tray handling, a five-second suspend/resume heuristic in the audio worker, and a persisted `config/shortcuts.json`. The interface adds **Sistema** and **Accesibilidad** settings, window-level playback shortcuts, a screen-reader live region, and forced reduced-motion/high-contrast overrides. See [native-integration.md](native-integration.md) for platform coverage, documented limitations, tests, and the manual acceptance checklist. Tracked as "En pruebas".
+
 ## Phase 12. Equalizer and Audio Processing
 
 **Objective:** complete processing without playback interruptions or interface blocking.

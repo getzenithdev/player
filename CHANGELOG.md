@@ -1,5 +1,14 @@
 # Changelog
 
+## Unreleased — Phase 11
+
+- Add OS media controls through `souvlaki` (Windows SMTC, Linux MPRIS, macOS Now Playing), global media keys, track notifications, a tray/menu-bar icon, and launch at login.
+- Add close-to-tray handling, tray and macOS application-menu playback commands, and output recovery after a five-second suspend/resume gap.
+- Persist native and accessibility preferences in `config/shortcuts.json` and expose them in new **Sistema** and **Accesibilidad** settings tabs.
+- Add a screen-reader live region, window-level playback shortcuts, forced reduced-motion and high-contrast overrides, stronger focus outlines, and forced-colors support.
+- Send artist and album metadata to native media controls and notifications.
+- Document platform coverage, limitations, automated tests, and pending installed-platform acceptance in `docs/native-integration.md`.
+
 ## Unreleased — Expanded player
 
 - Simplify copy across the app, remove repeated slogans/headings, consolidate library views into a selector and move secondary queue/provider details into disclosures.

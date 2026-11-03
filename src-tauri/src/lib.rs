@@ -6,6 +6,7 @@ mod library;
 mod library_commands;
 mod lyrics;
 mod metadata;
+mod native;
 mod playlist_commands;
 mod playlists;
 mod resources;
@@ -23,6 +24,20 @@ pub fn run() {
 
     tauri::Builder::default()
         .plugin(tauri_plugin_dialog::init())
+        .plugin(tauri_plugin_notification::init())
+        .plugin(
+            tauri_plugin_global_shortcut::Builder::new()
+                .with_handler(|app, shortcut, event| {
+                    if native::shortcut_pressed(event.state()) {
+                        native::on_global_shortcut(app, shortcut);
+                    }
+                })
+                .build(),
+        )
+        .plugin(tauri_plugin_autostart::init(
+            tauri_plugin_autostart::MacosLauncher::LaunchAgent,
+            Some(vec!["--hidden"]),
+        ))
         .manage(storage)
         .setup(|app| {
             // The audio worker opens the output device in the background so a
@@ -33,16 +48,26 @@ pub fn run() {
             ) {
                 eprintln!("No se pudieron preparar los metadatos: {error}");
             }
+            native::setup(app.handle());
             app.manage(audio::AudioEngine::new(app.handle().clone()));
             library_commands::start_monitor(app.handle().clone());
             Ok(())
         })
+        .on_menu_event(|app, event| native::on_menu_event(app, event.id().as_ref()))
         .on_window_event(|window, event| {
-            if matches!(event, tauri::WindowEvent::CloseRequested { .. })
-                && let Some(engine) = window.try_state::<audio::AudioEngine>()
-                && let Err(error) = engine.flush()
-            {
-                eprintln!("No se pudo guardar la sesión: {error}");
+            if let tauri::WindowEvent::CloseRequested { api, .. } = event {
+                // Closing to the tray keeps playback alive; the application
+                // only exits through the tray or menu quit action.
+                if native::should_hide_on_close(window) {
+                    api.prevent_close();
+                    let _ = window.hide();
+                    return;
+                }
+                if let Some(engine) = window.try_state::<audio::AudioEngine>()
+                    && let Err(error) = engine.flush()
+                {
+                    eprintln!("No se pudo guardar la sesión: {error}");
+                }
             }
         })
         .invoke_handler(tauri::generate_handler![
@@ -82,6 +107,9 @@ pub fn run() {
             audio::audio_restart_output,
             audio::audio_clear_queue,
             audio::audio_capabilities,
+            native::integration_get,
+            native::integration_save,
+            native::integration_notification_test,
         ])
         .run(tauri::generate_context!())
         .expect("error while running Zenith Player");

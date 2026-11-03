@@ -14,6 +14,14 @@ In the desktop application, **Cola → Abrir y reemplazar cola** loads local aud
 
 The user confirmed phases 1–9 validated on 2026-11-02. Historical module documents retain their original test/acceptance notes; the updated roadmap records this later acceptance.
 
+## Native Integration and Accessibility
+
+Phase 11 connects playback to the operating system. Windows uses the System Media Transport Controls, Linux uses MPRIS, and macOS uses Now Playing; the same layer registers media keys, shows track notifications, keeps a tray or menu-bar icon, and can hide the window on close. Launch at login, the global shortcuts, and every icon action can be enabled or disabled in **Configuración → Sistema**. Closing to the tray keeps playback alive until the user quits from the tray or application menu.
+
+**Configuración → Accesibilidad** adds a forced reduced-motion and high-contrast mode. A polite live region announces track changes to screen readers, `:focus-visible` outlines and system colors are preserved, and window-level shortcuts cover play/pause (Space), seeking (arrow keys), track changes (`Ctrl/Cmd + Left/Right`), mute (`M`), and search (`Ctrl/Cmd + K`). Text fields and focused controls keep their native keys.
+
+The audio worker detects a long gap between ticks and rebuilds the output after suspend/resume. Platform coverage, documented limitations, and the pending manual checks are listed in [Native integration and accessibility](docs/native-integration.md).
+
 ## Local Music Library
 
 **Biblioteca** supports importing files or multiple folders, searching songs and metadata, grouped views, favorites, history, and playback. Locations are reconciled every ten seconds or on demand. Metadata edits stay internal unless the user explicitly requests writing tags to the original; explicit writes retain a recovery copy. See [Music Library and Local Files](docs/music-library.md) for identity rules, limitations, and desktop acceptance steps.
@@ -84,6 +92,7 @@ GitHub Actions checks the frontend and compiles Windows x64, macOS Intel/Apple S
 - [Music library and local files](docs/music-library.md)
 - [Universal metadata and identity](docs/metadata-engine.md)
 - [Playlists, queue, and history](docs/playlists-queue.md)
+- [Native integration and accessibility](docs/native-integration.md)
 - [Development roadmap](docs/roadmap.md)
 
 Lyrics / Letras: [Phase 7 implementation and provider status](docs/lyrics-engine.md).

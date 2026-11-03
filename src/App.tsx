@@ -1,8 +1,25 @@
-import { useEffect, useRef, useState, type CSSProperties } from "react";
+import {
+  useCallback,
+  useEffect,
+  useRef,
+  useState,
+  type CSSProperties,
+} from "react";
 import { pickAudioFiles, useAudioEngine } from "./audio";
+import { accessibilityAttributes, playbackAnnouncement } from "./accessibility";
 import { Icon } from "./Icon";
 import { navigation, viewTitle, type AppView } from "./navigation";
 import { hasNativeStorage, loadAppearance, saveAppearance } from "./storage";
+import {
+  defaultIntegrationSettings,
+  loadIntegration,
+  normalizeIntegration,
+  saveIntegration,
+  subscribeNativeNotices,
+  type IntegrationSettings,
+  type IntegrationSnapshot,
+} from "./native";
+import { useGlobalShortcuts } from "./shortcuts";
 import { Library } from "./LibraryPanel";
 import { Playlists } from "./PlaylistsPanel";
 import { QueuePanel } from "./QueuePanel";
@@ -36,6 +53,13 @@ export default function App() {
   const [libraryQuery, setLibraryQuery] = useState("");
   const [picking, setPicking] = useState(false);
   const [themeError, setThemeError] = useState("");
+  const [integrationError, setIntegrationError] = useState("");
+  const [integration, setIntegration] = useState<IntegrationSettings>(
+    defaultIntegrationSettings,
+  );
+  const [integrationSnapshot, setIntegrationSnapshot] =
+    useState<IntegrationSnapshot | null>(null);
+  const [nativeNotice, setNativeNotice] = useState("");
   const [accent, setAccent] = useState<string | undefined>();
   const main = useRef<HTMLElement>(null);
   const search = useRef<HTMLInputElement>(null);
@@ -83,6 +107,81 @@ export default function App() {
     window.addEventListener("keydown", shortcut);
     return () => window.removeEventListener("keydown", shortcut);
   }, []);
+  useEffect(() => {
+    let disposed = false;
+    void loadIntegration()
+      .then((snapshot) => {
+        if (disposed || !snapshot) return;
+        setIntegration(snapshot.settings);
+        setIntegrationSnapshot(snapshot);
+      })
+      .catch((reason) => {
+        if (!disposed) setIntegrationError(String(reason));
+      });
+    return () => {
+      disposed = true;
+    };
+  }, []);
+  useEffect(() => {
+    let disposed = false;
+    let unlisten: (() => void) | undefined;
+    void subscribeNativeNotices(setNativeNotice).then((stop) => {
+      if (disposed) stop();
+      else unlisten = stop;
+    });
+    return () => {
+      disposed = true;
+      unlisten?.();
+    };
+  }, []);
+  useEffect(() => {
+    if (!nativeNotice) return;
+    const timer = window.setTimeout(() => setNativeNotice(""), 6000);
+    return () => window.clearTimeout(timer);
+  }, [nativeNotice]);
+  const trackTitle = audio.state.track?.title ?? null;
+  const trackArtist = audio.state.track?.artist ?? null;
+  const trackAlbum = audio.state.track?.album ?? null;
+  const playbackMessage = playbackAnnouncement(
+    trackTitle === null
+      ? null
+      : { title: trackTitle, artist: trackArtist, album: trackAlbum },
+    audio.state.status,
+  );
+  const announcement = nativeNotice
+    ? `${playbackMessage}. ${nativeNotice}`
+    : playbackMessage;
+  const {
+    toggle: toggleAudio,
+    next: nextAudio,
+    previous: previousAudio,
+    seek: seekAudio,
+    setMuted: setAudioMuted,
+  } = audio;
+  const togglePlayback = useCallback(() => void toggleAudio(), [toggleAudio]);
+  const playNext = useCallback(() => void nextAudio(), [nextAudio]);
+  const playPrevious = useCallback(() => void previousAudio(), [previousAudio]);
+  const seekTo = useCallback(
+    (positionMs: number) => void seekAudio(positionMs),
+    [seekAudio],
+  );
+  const mute = useCallback(
+    (muted: boolean) => void setAudioMuted(muted),
+    [setAudioMuted],
+  );
+  useGlobalShortcuts(
+    {
+      toggle: togglePlayback,
+      next: playNext,
+      previous: playPrevious,
+      seek: seekTo,
+      setMuted: mute,
+      muted: audio.state.muted,
+      positionMs: audio.state.positionMs,
+      durationMs: audio.state.durationMs,
+    },
+    audio.available,
+  );
   async function changeTheme(next: string) {
     setTheme(next);
     setThemeError("");
@@ -92,6 +191,22 @@ export default function App() {
       } catch (reason) {
         setThemeError(String(reason));
       }
+  }
+  async function changeIntegration(next: IntegrationSettings) {
+    const previous = integration;
+    setIntegration(normalizeIntegration(next));
+    setIntegrationError("");
+    try {
+      const snapshot = await saveIntegration(next);
+      if (!snapshot) return;
+      setIntegration(snapshot.settings);
+      setIntegrationSnapshot(snapshot);
+      if (snapshot.notices.length)
+        setNativeNotice(snapshot.notices[snapshot.notices.length - 1]);
+    } catch (reason) {
+      setIntegration(previous);
+      setIntegrationError(String(reason));
+    }
   }
   async function openFiles() {
     if (!audio.available) return;
@@ -170,6 +285,9 @@ export default function App() {
             theme={theme}
             onTheme={(next) => void changeTheme(next)}
             onSources={() => navigate("sources")}
+            integration={integration}
+            integrationSnapshot={integrationSnapshot}
+            onIntegration={(next) => void changeIntegration(next)}
           />
         );
     }
@@ -178,6 +296,7 @@ export default function App() {
     <div
       className="workspace"
       data-theme={theme}
+      {...accessibilityAttributes(integration)}
       style={{ "--artwork-color": accent } as CSSProperties}
       onLoad={(event) => {
         const image = event.target;
@@ -203,6 +322,14 @@ export default function App() {
       <a className="skip-link" href="#main-content">
         Saltar al contenido
       </a>
+      <p
+        className="sr-only"
+        role="status"
+        aria-live="polite"
+        aria-atomic="true"
+      >
+        {announcement}
+      </p>
       <aside className="sidebar">
         <button
           className="brand"
@@ -281,9 +408,9 @@ export default function App() {
               Abriendo tu biblioteca…
             </p>
           )}
-          {(error || themeError) && (
+          {(error || themeError || integrationError) && (
             <p className="error-note" role="alert">
-              {error || themeError}
+              {error || themeError || integrationError}
             </p>
           )}
           {(audio.error || audio.state.error) && (

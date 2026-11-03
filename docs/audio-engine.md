@@ -84,5 +84,5 @@ The generated WAV unit test in `audio.rs` checks decoding metadata and duration 
 - Gapless playback, crossfade, balance, speed, ReplayGain, normalization, equalization, and output-device selection are prepared but implemented in phase 12.
 - Phase 5 adds persistent independent queue editing, playlists, session restoration without autoplay, and listening history. See [playlists-queue.md](playlists-queue.md).
 - Tags, embedded artwork, and library identity belong to phases 4 and 6.
-- Native media keys, system media controls, and notifications belong to phase 11.
+- Native media keys, system media controls, notifications, and the suspend/resume heuristic are implemented in phase 11; see [native-integration.md](native-integration.md).
 - The output watchdog is a recovery heuristic, not a platform device-change notification.

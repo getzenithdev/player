@@ -28,6 +28,11 @@ pub struct Entry {
     pub track_id: Option<String>,
     pub path: String,
     pub title: String,
+    /// Optional metadata used by OS media controls and notifications.
+    #[serde(default)]
+    pub artist: Option<String>,
+    #[serde(default)]
+    pub album: Option<String>,
     #[serde(default)]
     pub duration_ms: Option<u64>,
     #[serde(default)]
@@ -45,6 +50,8 @@ impl Entry {
                 .unwrap_or_default()
                 .to_string_lossy()
                 .into_owned(),
+            artist: None,
+            album: None,
             format: path
                 .extension()
                 .unwrap_or_default()
@@ -141,6 +148,8 @@ pub fn resolve_entries(entries: &mut [Entry], library: &TracksDocument) {
             entry.path = path.clone();
             entry.track_id = Some(t.id.clone());
             entry.title = t.title.clone();
+            entry.artist = t.artist.clone();
+            entry.album = t.album.clone();
             entry.duration_ms = t.duration.map(|s| s.saturating_mul(1000));
             entry.format = t.format.clone();
         }
