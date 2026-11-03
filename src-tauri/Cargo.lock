@@ -6030,6 +6030,7 @@ dependencies = [
  "base64 0.22.1",
  "image",
  "keyring",
+ "libc",
  "lofty",
  "rand 0.9.5",
  "reqwest",

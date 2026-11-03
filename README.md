@@ -28,7 +28,7 @@ Phase 6 adds normalized names with original-value preservation, source-neutral t
 
 ## External Sources
 
-Phase 9 adds **Fuentes**, where every provider declares its own capabilities, so the interface only offers search, browsing, playback, download, or revocation when the provider supports it. Local library search works with no network and with the external opt-in disabled. YouTube connects with your own API key for metadata only — no audio is extracted, so it declares no playback or download. Google Drive, Dropbox, and OneDrive connect through OAuth 2.0 with PKCE using your own client ID and a loopback redirect; WebDAV needs an HTTPS address with username and password.
+Phase 9 adds **Fuentes**, where every provider declares its own capabilities, so the interface only offers search, browsing, playback, download, or revocation when the provider supports it. Local library search works with no network and with the external opt-in disabled. YouTube automático is the primary keyless provider, preparing AAC/M4A audio in cache through local yt-dlp and Node 22 helpers. YouTube API remains a separate metadata-only alternative with existing keys preserved. Google Drive, Dropbox, and OneDrive connect through OAuth 2.0 with PKCE using your own client ID and a loopback redirect; WebDAV needs an HTTPS address with username and password.
 
 Connections and non-secret settings persist in `config/providers.json`, which the data export never includes, while passwords, API keys, client secrets, and tokens stay in the operating system credential store. Network actions stay off until **Permitir consultas a servicios externos** is enabled. Downloads are stored once in `cache/audio/` and handed to the audio engine, so playback keeps working when a token expires or the network is lost. See [External sources](docs/external-sources.md) for the contract, provider endpoints, limits, tests, and pending manual acceptance.
 
@@ -44,7 +44,7 @@ The Rust layer (`src-tauri/src/storage/`) carries 25 unit tests covering layout,
 
 ## Development
 
-Install Node.js 24 and the [native prerequisites](docs/environment.md) for your operating system, then run:
+Install Node.js 22 (22.12+; use this version on Monterey) or Node.js 24 on newer systems, and the [native prerequisites](docs/environment.md) for your operating system, then run:
 
 ```sh
 npm ci
@@ -91,3 +91,7 @@ Lyrics / Letras: [Phase 7 implementation and provider status](docs/lyrics-engine
 Artwork / Portadas: [Phase 8 implementation and provider status](docs/artwork-engine.md).
 
 External sources / Fuentes: [Phase 9 implementation and provider status](docs/external-sources.md).
+
+### YouTube without an API key / YouTube sin API key
+
+YouTube automático is the primary provider, with the existing API retained as a metadata-only alternative. Desktop builds include pinned yt-dlp and Node 22 helpers. Audio is prepared as an AAC/M4A cache file before playback. Setup guides for every provider are inside Fuentes → Proveedores. See [the provider documentation](docs/youtube-provider.md) for packaging, limits, source permissions and the pending actual-Monterey acceptance checks.

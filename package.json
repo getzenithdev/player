@@ -19,7 +19,8 @@
     "check": "npm run check:paths && npm run typecheck && npm run lint && npm run format:check && npm test",
     "test:watch": "vitest",
     "format": "prettier --write .",
-    "check:paths": "node scripts/check-module-paths.mjs"
+    "check:paths": "node scripts/check-module-paths.mjs",
+    "youtube:prepare": "node scripts/prepare-youtube.mjs"
   },
   "dependencies": {
     "@tauri-apps/api": "^2",
@@ -45,6 +46,6 @@
     "vitest": "^5.0.5"
   },
   "engines": {
-    "node": ">=24.0.0 <25"
+    "node": ">=22.12.0 <23 || >=24.0.0 <25"
   }
 }

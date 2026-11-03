@@ -7,13 +7,16 @@ Every provider implements the same contract in `src-tauri/src/sources.rs`: a dec
 | Provider | Auth | Capabilities | Notes |
 | --- | --- | --- | --- |
 | Local | none | search, read, playback | Library and playback without network. |
-| YouTube | API key | auth, search, read | Metadata and availability only; no audio extraction, so no playback or download. |
+| YouTube automático (primary) | none | search, read, playback, download | Local yt-dlp + Node 22, audio prepared as AAC/M4A cache files. |
+| YouTube API (alternative) | API key | auth, search, read | Metadata only; existing credentials preserved. |
 | Google Drive | OAuth 2.0 + PKCE | auth, search, read, playback, download, revoke | User-supplied `client_id`, scope `drive.readonly`. |
 | Dropbox | OAuth 2.0 + PKCE | auth, search, read, playback, download, revoke | User-supplied `client_id`, scopes `files.metadata.read files.content.read account_info.read`. |
 | OneDrive | OAuth 2.0 + PKCE | auth, search, read, playback, download | User-supplied `client_id`, scope `Files.Read offline_access`; disconnect locally and remove consent in the Microsoft account. |
 | WebDAV | password | auth, search, read, playback, download | HTTPS endpoint, username and password; no revocation endpoint exists. |
 
-Connection states are `disconnected`, `pending`, `connected`, `expired`, `revoked` and `error`. One Tauri command, `sources_action`, receives an action enum tagged `kind` in camelCase (`snapshot`, `external`, `settings`, `connect`, `finish`, `disconnect`, `revoke`, `search`, `browse`, `download`) and always returns the full `Snapshot`: providers, results, external flag, pending authorization URL, last download path and warnings.
+Connection states are `disconnected`, `pending`, `connected`, `expired`, `revoked` and `error`. See [youtube-provider.md](youtube-provider.md) for extraction, packaging, limitations and Monterey checks.
+
+One Tauri command, `sources_action`, receives an action enum tagged `kind` in camelCase (`snapshot`, `external`, `settings`, `connect`, `finish`, `disconnect`, `revoke`, `search`, `browse`, `download`) and always returns the full `Snapshot`: providers, results, external flag, pending authorization URL, last download path and warnings.
 
 ## Connections and secrets
 
@@ -30,7 +33,7 @@ Connection states are `disconnected`, `pending`, `connected`, `expired`, `revoke
 
 ## OAuth 2.0 with PKCE
 
-`Connect` validates the supplied fields, binds a loopback listener on `127.0.0.1:<ephemeral port>` and returns `pending_url`; the UI shows it and the application opens the default browser. The authorization request carries `state`, an S256 `code_challenge` and the provider's `redirect_uri`. `Finish` waits up to 300 s for `GET /callback`, rejects a callback with a different `state`, exchanges the code with the `code_verifier`, stores the tokens in the credential store and reads the account label best-effort. Only one authorization can be pending at a time; a new `Connect` cancels the previous listener.
+`Connect` validates the supplied fields, binds a loopback listener (Google: `127.0.0.1:<ephemeral port>`; Dropbox: fixed `127.0.0.1:53682`; OneDrive: localhost URI with an ephemeral IPv4 port) and returns `pending_url`; the UI shows it and the application opens the default browser. The authorization request carries `state`, an S256 `code_challenge` and the provider's `redirect_uri`. `Finish` waits up to 300 s for `GET /callback`, rejects a callback with a different `state`, exchanges the code with the `code_verifier`, stores the tokens in the credential store and reads the account label best-effort. Only one authorization can be pending at a time; a new `Connect` cancels the previous listener.
 
 Access tokens are refreshed on demand when a refresh token exists; a refused refresh marks the connection `expired` and the next query explains that the authorization must be repeated. `Revoke` calls the provider's revocation endpoint when it has one and always deletes the stored credential; `Disconnect` deletes the credential and resets the connection without touching other providers.
 
@@ -42,7 +45,7 @@ Dropbox revocation uses `POST /2/auth/token/revoke` with bearer authentication a
 
 Search and browse return `Entry` values (`folder`, `audio`, `video`, `file`) with a relative identifier, a display name, a detail line, an optional size and an optional HTTPS source URL. Google Drive, Dropbox and OneDrive search their API and browse folders; WebDAV sends `PROPFIND` for the requested path and filters that listing by name for a search; the local provider searches the library index. Folders are opened only for providers that declare `read` and only from the interface's **Abrir carpeta** action.
 
-Downloads are stored once under `cache/audio/` with a content-derived name and an extension taken from the file name or content type (`mp3`, `flac`, `wav`, `ogg`, `m4a`, `aac`, `aiff`, `caf`); a second download of the same entry reuses the cached file. Google Drive uses `alt=media`, Dropbox uses `files/download` with `Dropbox-API-Arg`, OneDrive asks Graph for `@microsoft.graph.downloadUrl`, and WebDAV downloads the validated URL with basic authentication. The returned absolute path is handed to the audio engine (**Reproducir** or **Reproducir descarga**), so playback always goes through files the engine already understands. YouTube refuses downloads explicitly, and the local provider returns the file path of the library track.
+Downloads are stored once under `cache/audio/` with a content-derived name and an extension taken from the file name or content type (`mp3`, `flac`, `wav`, `ogg`, `m4a`, `aac`, `aiff`, `caf`); a second download of the same entry reuses the cached file. Google Drive uses `alt=media`, Dropbox uses `files/download` with `Dropbox-API-Arg`, OneDrive asks Graph for `@microsoft.graph.downloadUrl`, and WebDAV downloads the validated URL with basic authentication. The returned absolute path is handed to the audio engine (**Reproducir** or **Reproducir descarga**), so playback always goes through files the engine already understands. The YouTube API alternative refuses downloads explicitly; YouTube automático prepares compatible AAC/M4A through its local helper, and the local provider returns the file path of the library track.
 
 ## Interface
 
@@ -62,4 +65,8 @@ Validation recorded on Windows x64, 2026-11-02: `npm run check` passed (28 front
 
 La fase 9 conecta servicios externos mediante un contrato común: cada proveedor declara sus capacidades y la interfaz solo ofrece las acciones que declara. Las contraseñas, claves y tokens viven en el almacén de credenciales del sistema; `config/providers.json` guarda únicamente conexiones y ajustes, y la exportación de datos nunca lo incluye. Las consultas externas siguen desactivadas hasta que las permites explícitamente.
 
-YouTube se limita a búsqueda y metadatos con tu propia clave de API: no se extrae audio ni se ofrece reproducción o descarga. Google Drive, Dropbox y OneDrive usan OAuth 2.0 con PKCE y tu propio ID de cliente, con autorización en el navegador y caducidad gestionada; WebDAV exige HTTPS con usuario y contraseña. Las descargas se guardan en la caché local y se reproducen con el motor de audio, de modo que la biblioteca local sigue funcionando con la red caída o las autorizaciones caducadas. Falta la aceptación manual con credenciales reales en las aplicaciones instaladas.
+YouTube automático es la opción principal, sin clave, con búsqueda y preparación de audio AAC/M4A mediante yt-dlp local. YouTube API queda como alternativa independiente de búsqueda y metadatos con tu propia clave, sin reproducción ni descarga. Google Drive, Dropbox y OneDrive usan OAuth 2.0 con PKCE y tu propio ID de cliente, con autorización en el navegador y caducidad gestionada; WebDAV exige HTTPS con usuario y contraseña. Las descargas se guardan en la caché local y se reproducen con el motor de audio, de modo que la biblioteca local sigue funcionando con la red caída o las autorizaciones caducadas. Falta la aceptación manual con credenciales reales en las aplicaciones instaladas.
+
+## Setup guides
+
+Every provider card includes ordered setup instructions and an official-site button. Drive uses a Desktop OAuth client and drive.readonly; Dropbox uses PKCE, a fixed registered return URI and read-only scopes; OneDrive uses a public desktop client and localhost return URI. WebDAV uses the server HTTPS endpoint and preferably an app password. See `src/providerGuides.ts` for the exact UI instructions. No credentials need to be committed or sent to the application distributor.

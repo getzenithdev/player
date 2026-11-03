@@ -26,3 +26,7 @@ vite.config.d.ts
 *.njsproj
 *.sln
 *.sw?
+
+# Verified helper binaries generated during desktop development/build
+src-tauri/tools/*
+!src-tauri/tools/README.txt

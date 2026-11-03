@@ -1,7 +1,13 @@
 import { invoke } from "@tauri-apps/api/core";
 
 export type ProviderId =
-  "local" | "youtube" | "google-drive" | "dropbox" | "onedrive" | "webdav";
+  | "local"
+  | "youtube-auto"
+  | "youtube"
+  | "google-drive"
+  | "dropbox"
+  | "onedrive"
+  | "webdav";
 export type Capability =
   "auth" | "search" | "read" | "playback" | "download" | "revoke";
 export type AuthKind = "none" | "api_key" | "oauth2" | "password";
@@ -110,7 +116,7 @@ export function hasCapability(
 
 /** Whether the connection form can be offered again for this provider. */
 export function canConnect(provider: ProviderStatus): boolean {
-  if (provider.id === "local") return false;
+  if (provider.id === "local" || provider.id === "youtube-auto") return false;
   return (
     provider.state === "disconnected" ||
     provider.state === "expired" ||
@@ -126,6 +132,7 @@ export function canQuery(provider: ProviderStatus): boolean {
 export function canDisconnect(provider: ProviderStatus): boolean {
   return (
     provider.id !== "local" &&
+    provider.id !== "youtube-auto" &&
     (provider.has_secret ||
       !["disconnected", "revoked"].includes(provider.state))
   );

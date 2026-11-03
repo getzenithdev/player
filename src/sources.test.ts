@@ -157,3 +157,41 @@ it("formats sizes and keeps an empty snapshot", () => {
     warnings: [],
   });
 });
+
+it("keeps automatic YouTube usable without a connection form or API key", () => {
+  const automatic = provider({
+    id: "youtube-auto",
+    auth: "none",
+    state: "connected",
+    has_secret: false,
+    capabilities: ["search", "read", "playback", "download"],
+  });
+  expect(canConnect(automatic)).toBe(false);
+  expect(canDisconnect(automatic)).toBe(false);
+  expect(canQuery(automatic)).toBe(true);
+  expect(
+    entryActions(automatic, {
+      provider: "youtube-auto",
+      id: "BaW_jenozKc",
+      name: "Test",
+      kind: "audio",
+      detail: "",
+      size: null,
+      source_url: null,
+    }),
+  ).toEqual({ play: true, download: true });
+  expect(
+    entryActions(
+      provider({ id: "youtube", capabilities: ["search", "read"] }),
+      {
+        provider: "youtube",
+        id: "BaW_jenozKc",
+        name: "Test",
+        kind: "video",
+        detail: "",
+        size: null,
+        source_url: null,
+      },
+    ),
+  ).toEqual({ play: false, download: false });
+});

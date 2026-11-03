@@ -11,7 +11,7 @@ use std::sync::atomic::AtomicUsize;
 /// create, finish or cancel a connection run one at a time.
 static SERIAL: Mutex<()> = Mutex::new(());
 
-fn serial() -> std::sync::MutexGuard<'static, ()> {
+pub(super) fn serial() -> std::sync::MutexGuard<'static, ()> {
     SERIAL.lock().unwrap_or_else(|error| error.into_inner())
 }
 
@@ -340,6 +340,7 @@ fn plain_env() -> Env {
     Env {
         open_browser: false,
         endpoints: BTreeMap::new(),
+        youtube_tools: PathBuf::from("missing-test-tools"),
     }
 }
 
@@ -389,7 +390,7 @@ fn each_provider_declares_only_the_capabilities_it_implements() {
         assert_eq!(info.required, vec!["client_id".to_string()]);
     }
 
-    assert_eq!(registry().len(), 6);
+    assert_eq!(registry().len(), 7);
     assert!(registry().iter().all(|info| !info.name.is_empty()));
 }
 
@@ -862,6 +863,7 @@ fn authorize(f: &Fixture, env: &Env, answer: impl FnOnce(&str, &str)) -> Result<
 fn oauth_env(server: &MockServer) -> Env {
     Env {
         open_browser: false,
+        youtube_tools: PathBuf::from("missing-test-tools"),
         endpoints: BTreeMap::from([(
             ProviderId::GoogleDrive,
             Endpoints {
@@ -1265,4 +1267,86 @@ fn downloaded_audio_is_available_offline_and_excludes_unfinished_files() {
     assert_eq!(snapshot.results[0].name, "saved.mp3");
     assert!(Path::new(&snapshot.results[0].id).is_file());
     assert!(f.vault.entries.lock().unwrap().is_empty());
+}
+
+#[test]
+fn automatic_youtube_is_primary_without_secrets_and_respects_network_opt_in() {
+    let _guard = serial();
+    let fixture = Fixture::new();
+    let env = plain_env();
+    let snapshot = fixture.run(&env, Action::Snapshot).unwrap();
+    let automatic = provider(&snapshot, ProviderId::YoutubeAuto);
+    assert_eq!(automatic.state, ConnectionState::Connected);
+    assert_eq!(automatic.info.auth, AuthKind::None);
+    assert!(!automatic.has_secret);
+    assert!(automatic.info.required.is_empty());
+    assert!(automatic.info.capabilities.contains(&Capability::Playback));
+    assert_eq!(snapshot.providers[1].info.id, ProviderId::YoutubeAuto);
+    assert_eq!(snapshot.providers[2].info.id, ProviderId::Youtube);
+    let error = fixture
+        .run(
+            &env,
+            Action::Search {
+                provider: ProviderId::YoutubeAuto,
+                query: "Test".into(),
+            },
+        )
+        .unwrap_err();
+    assert!(error.contains("Activa"));
+    fixture.enable_external(&env);
+    let error = fixture
+        .run(
+            &env,
+            Action::Search {
+                provider: ProviderId::YoutubeAuto,
+                query: "Test".into(),
+            },
+        )
+        .unwrap_err();
+    assert!(error.contains("Faltan los componentes"));
+    assert!(!fixture.document().contains("api_key"));
+    // A missing extractor never affects local search.
+    fixture.seed_library();
+    assert_eq!(
+        fixture
+            .run(
+                &env,
+                Action::Search {
+                    provider: ProviderId::Local,
+                    query: "Nocturne".into()
+                }
+            )
+            .unwrap()
+            .results
+            .len(),
+        1
+    );
+}
+
+#[test]
+fn oauth_callbacks_match_the_documented_provider_registrations() {
+    let _guard = serial();
+    cancel_pending(None);
+    let env = plain_env();
+    let settings = ProviderSettings {
+        client_id: "client-test".into(),
+        ..ProviderSettings::default()
+    };
+    for id in [ProviderId::Dropbox, ProviderId::OneDrive] {
+        let url = begin_oauth(id, &settings, &env).unwrap();
+        let parsed = reqwest::Url::parse(&url).unwrap();
+        let redirect = parsed
+            .query_pairs()
+            .find(|(k, _)| k == "redirect_uri")
+            .unwrap()
+            .1
+            .to_string();
+        if id == ProviderId::Dropbox {
+            assert_eq!(redirect, "http://127.0.0.1:53682/callback");
+        } else {
+            assert!(redirect.starts_with("http://localhost:"));
+            assert!(redirect.ends_with("/callback"));
+        }
+        cancel_pending(None);
+    }
 }

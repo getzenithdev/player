@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useRef, useState } from "react";
 import { isTauri } from "@tauri-apps/api/core";
 import type { AudioController } from "./audio";
+import { entryFromPath } from "./playlists";
 import {
   canConnect,
   canDisconnect,
@@ -19,6 +20,7 @@ import {
   type SourcesSnapshot,
 } from "./sources";
 import "./Resources.css";
+import { providerGuides } from "./providerGuides";
 
 /** Shown when the panel runs in a browser without the Rust side. */
 const nativeOnlySourcesMessage =
@@ -36,8 +38,9 @@ export function Sources({
   const [snapshot, setSnapshot] = useState(emptySources);
   const [error, setError] = useState("");
   const [busy, setBusy] = useState(false);
+  const [youtubeBusy, setYoutubeBusy] = useState(false);
   const [query, setQuery] = useState(initialQuery);
-  const [target, setTarget] = useState<ProviderId>("local");
+  const [target, setTarget] = useState<ProviderId>("youtube-auto");
   const [forms, setForms] = useState<Record<string, Record<string, string>>>(
     {},
   );
@@ -52,23 +55,40 @@ export function Sources({
       }
       const token = ++requests.current;
       setBusy(true);
+      const operation = action as { kind?: string; provider?: ProviderId };
+      setYoutubeBusy(
+        operation.provider === "youtube-auto" &&
+          ["search", "download"].includes(operation.kind ?? ""),
+      );
       setError("");
       try {
         const next = await sourcesAction(action);
-        if (token === requests.current) setSnapshot(next);
+        if (token === requests.current)
+          setSnapshot((previous) => ({
+            ...next,
+            results: ["search", "browse", "downloads"].includes(
+              operation.kind ?? "",
+            )
+              ? next.results
+              : previous.results,
+          }));
         return next;
       } catch (reason) {
         if (token === requests.current) setError(String(reason));
         // A failed authorization or refresh may have changed connection state.
         try {
           const next = await sourcesAction({ kind: "snapshot" });
-          if (token === requests.current) setSnapshot(next);
+          if (token === requests.current)
+            setSnapshot((previous) => ({ ...next, results: previous.results }));
         } catch {
           // Keep the original error when storage itself is unavailable.
         }
         return null;
       } finally {
-        if (token === requests.current) setBusy(false);
+        if (token === requests.current) {
+          setBusy(false);
+          setYoutubeBusy(false);
+        }
       }
     },
     [],
@@ -103,6 +123,7 @@ export function Sources({
     !!activeProvider &&
     activeTarget !== "local" &&
     activeTarget !== "youtube" &&
+    activeTarget !== "youtube-auto" &&
     hasCapability(activeProvider, "read");
   const needsExternal = activeTarget !== "local";
 
@@ -124,7 +145,10 @@ export function Sources({
       provider: entry.provider,
       id: entry.id,
     });
-    if (next?.downloaded) audio.openFiles([next.downloaded]);
+    if (next?.downloaded)
+      audio.openEntries([
+        { ...entryFromPath(next.downloaded), title: entry.name },
+      ]);
   }
 
   const pending = providers.filter((item) => item.state === "pending");
@@ -156,6 +180,36 @@ export function Sources({
       </fieldset>
 
       {!native && <p className="inline-note">{nativeOnlySourcesMessage}</p>}
+
+      {youtubeBusy && (
+        <div className="resource-actions" role="status">
+          <span>Preparando YouTube…</span>
+          <button
+            className="button small"
+            onClick={() =>
+              void sourcesAction({ kind: "cancelYoutube" }).catch((reason) =>
+                setError(String(reason)),
+              )
+            }
+          >
+            Cancelar
+          </button>
+        </div>
+      )}
+      {!!error &&
+        activeTarget === "youtube-auto" &&
+        providers.some((item) => item.id === "youtube" && canQuery(item)) && (
+          <button
+            className="button"
+            disabled={busy}
+            onClick={() => {
+              setTarget("youtube");
+              void load({ kind: "search", provider: "youtube", query });
+            }}
+          >
+            Buscar con YouTube API (solo metadatos)
+          </button>
+        )}
 
       {!!snapshot.pending_url && (
         <div className="resource-attribution">
@@ -191,8 +245,34 @@ export function Sources({
               )}
               <p>{stateHint(provider)}</p>
               <details className="source-details">
-                <summary>Detalles</summary>
+                <summary>{providerGuides[provider.id].title}</summary>
                 <p>{provider.note}</p>
+                <ol className="source-guide">
+                  {providerGuides[provider.id].steps.map((step) => (
+                    <li key={step}>{step}</li>
+                  ))}
+                </ol>
+                {providerGuides[provider.id].note && (
+                  <p className="inline-note">
+                    {providerGuides[provider.id].note}
+                  </p>
+                )}
+                {providerGuides[provider.id].website && (
+                  <>
+                    <p className="secondary">
+                      {providerGuides[provider.id].website}
+                    </p>
+                    <button
+                      className="button small"
+                      disabled={busy || !native}
+                      onClick={() =>
+                        void load({ kind: "openGuide", provider: provider.id })
+                      }
+                    >
+                      Abrir sitio oficial
+                    </button>
+                  </>
+                )}
               </details>
               {canConnect(provider) && snapshot.external && (
                 <form
@@ -382,7 +462,8 @@ export function Sources({
                 !!source &&
                 hasCapability(source, "read") &&
                 entry.provider !== "local" &&
-                entry.provider !== "youtube";
+                entry.provider !== "youtube" &&
+                entry.provider !== "youtube-auto";
               return (
                 <li key={`${entry.provider}-${entry.id}-${index}`}>
                   <div>

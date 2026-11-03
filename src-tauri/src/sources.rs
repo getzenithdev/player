@@ -8,6 +8,7 @@
 //! engine already understands.
 
 use crate::storage::{StorageManager, indexes::TrackHit};
+mod youtube;
 use base64::{
     Engine as _,
     engine::general_purpose::{STANDARD, URL_SAFE_NO_PAD},
@@ -73,6 +74,8 @@ pub enum ProviderId {
     Local,
     #[serde(rename = "youtube")]
     Youtube,
+    #[serde(rename = "youtube-auto")]
+    YoutubeAuto,
     #[serde(rename = "google-drive")]
     GoogleDrive,
     #[serde(rename = "dropbox")]
@@ -88,6 +91,7 @@ impl ProviderId {
         match self {
             Self::Local => "local",
             Self::Youtube => "youtube",
+            Self::YoutubeAuto => "youtube-auto",
             Self::GoogleDrive => "google-drive",
             Self::Dropbox => "dropbox",
             Self::OneDrive => "onedrive",
@@ -98,7 +102,8 @@ impl ProviderId {
     fn label(self) -> &'static str {
         match self {
             Self::Local => "Biblioteca local",
-            Self::Youtube => "YouTube",
+            Self::Youtube => "YouTube API (alternativa)",
+            Self::YoutubeAuto => "YouTube automático",
             Self::GoogleDrive => "Google Drive",
             Self::Dropbox => "Dropbox",
             Self::OneDrive => "OneDrive",
@@ -233,6 +238,10 @@ pub struct Snapshot {
 #[serde(tag = "kind", rename_all = "camelCase")]
 pub enum Action {
     Snapshot,
+    CancelYoutube,
+    OpenGuide {
+        provider: ProviderId,
+    },
     Downloads,
     External {
         enabled: bool,
@@ -281,12 +290,20 @@ fn registry() -> Vec<ProviderInfo> {
             note: "Biblioteca y reproducción locales, sin red.".into(),
         },
         ProviderInfo {
+            id: ProviderId::YoutubeAuto,
+            name: ProviderId::YoutubeAuto.label().into(),
+            auth: AuthKind::None,
+            capabilities: vec![Capability::Search, Capability::Read, Capability::Playback, Capability::Download],
+            required: vec![],
+            note: "Opción principal, sin API key. Usa yt-dlp local para buscar y preparar audio AAC/M4A en caché antes de reproducir. Puede fallar por cambios o restricciones de YouTube; la API alternativa solo ofrece metadatos.".into(),
+        },
+        ProviderInfo {
             id: ProviderId::Youtube,
             name: ProviderId::Youtube.label().into(),
             auth: AuthKind::ApiKey,
             capabilities: vec![Capability::Auth, Capability::Search, Capability::Read],
             required: vec!["api_key".into()],
-            note: "YouTube Data API con clave propia. No se extrae audio: sin una integración oficial no hay reproducción."
+            note: "Opción alternativa: YouTube Data API con clave propia para búsqueda y metadatos; no proporciona audio ni sustituye la extracción cuando falla."
                 .into(),
         },
         ProviderInfo {
@@ -400,7 +417,7 @@ fn endpoints(provider: ProviderId) -> Endpoints {
             api: "https://www.googleapis.com/youtube/v3/".into(),
             content: String::new(),
         },
-        ProviderId::Local | ProviderId::Webdav => Endpoints {
+        ProviderId::Local | ProviderId::Webdav | ProviderId::YoutubeAuto => Endpoints {
             authorize: String::new(),
             token: String::new(),
             revoke: None,
@@ -424,6 +441,7 @@ fn scope(provider: ProviderId) -> &'static str {
 struct Env {
     open_browser: bool,
     endpoints: BTreeMap<ProviderId, Endpoints>,
+    youtube_tools: PathBuf,
 }
 
 impl Default for Env {
@@ -431,6 +449,9 @@ impl Default for Env {
         Self {
             open_browser: true,
             endpoints: BTreeMap::new(),
+            youtube_tools: std::env::current_exe()
+                .unwrap_or_default()
+                .with_file_name("tools"),
         }
     }
 }
@@ -1110,8 +1131,30 @@ fn begin_oauth(
     let (tx_result, rx_result) = mpsc::channel();
     let listener_cancel = cancel.clone();
     let listener_state = state.clone();
+    // Dropbox requires an exact registered URI; Microsoft ignores the port
+    // only for localhost URIs. Google desktop clients allow an ephemeral port.
+    let bind_address = if provider == ProviderId::Dropbox {
+        "127.0.0.1:53682"
+    } else {
+        "127.0.0.1:0"
+    };
+    let listener = TcpListener::bind(bind_address).map_err(|_| {
+        if provider == ProviderId::Dropbox {
+            "El puerto 53682 de Dropbox está ocupado"
+        } else {
+            "No se pudo preparar la autorización local"
+        }
+        .to_string()
+    })?;
     std::thread::spawn(move || {
-        listen_for_redirect(listener_cancel, listener_state, tx_port, tx_result);
+        listen_for_redirect(
+            listener,
+            provider,
+            listener_cancel,
+            listener_state,
+            tx_port,
+            tx_result,
+        );
     });
     let redirect_uri = rx_port
         .recv_timeout(Duration::from_secs(5))
@@ -1148,21 +1191,25 @@ fn begin_oauth(
 }
 
 fn listen_for_redirect(
+    listener: TcpListener,
+    provider: ProviderId,
     cancel: Arc<AtomicBool>,
     expected_state: String,
     tx_port: mpsc::Sender<Result<String, String>>,
     tx_result: mpsc::Sender<Result<String, String>>,
 ) {
-    let Ok(listener) = TcpListener::bind("127.0.0.1:0") else {
-        return;
-    };
     let Ok(port) = listener.local_addr().map(|address| address.port()) else {
         return;
     };
     if listener.set_nonblocking(true).is_err() {
         return;
     }
-    let _ = tx_port.send(Ok(format!("http://127.0.0.1:{port}/callback")));
+    let host = if provider == ProviderId::OneDrive {
+        "localhost"
+    } else {
+        "127.0.0.1"
+    };
+    let _ = tx_port.send(Ok(format!("http://{host}:{port}/callback")));
     let deadline = Instant::now() + AUTH_TIMEOUT;
     let mut answered = false;
     while Instant::now() < deadline && !cancel.load(Ordering::Relaxed) {
@@ -2369,6 +2416,9 @@ fn download(
     if provider == ProviderId::Local {
         return local_download(storage, id);
     }
+    if provider == ProviderId::YoutubeAuto {
+        return youtube::download(storage, &env.youtube_tools, id);
+    }
     if provider == ProviderId::Youtube {
         return Err("YouTube no permite descargas".into());
     }
@@ -2466,6 +2516,9 @@ fn search(
     if provider == ProviderId::Local {
         return Ok(local_search(storage, query));
     }
+    if provider == ProviderId::YoutubeAuto {
+        return youtube::search(&env.youtube_tools, query);
+    }
     let active = active(storage, store, env, provider)?;
     let endpoints = env.endpoints(provider);
     match provider {
@@ -2537,6 +2590,9 @@ fn snapshot(
                 .unwrap_or_default();
             if info.id == ProviderId::Local {
                 connection.state = ConnectionState::Connected;
+            } else if info.id == ProviderId::YoutubeAuto {
+                connection.state = ConnectionState::Connected;
+                connection.label = "Sin clave · proveedor principal".into();
             } else if connection.state == ConnectionState::Pending
                 && !pending.is_some_and(|pending| pending.provider == info.id)
             {
@@ -2579,6 +2635,24 @@ fn execute_with(
     let mut downloaded: Option<String> = None;
     match action {
         Action::Snapshot => {}
+        Action::OpenGuide { provider } => {
+            let url = match provider {
+                ProviderId::YoutubeAuto => "https://github.com/yt-dlp/yt-dlp",
+                ProviderId::Youtube | ProviderId::GoogleDrive => {
+                    "https://console.cloud.google.com/"
+                }
+                ProviderId::Dropbox => "https://www.dropbox.com/developers/apps",
+                ProviderId::OneDrive => "https://entra.microsoft.com/",
+                ProviderId::Webdav => {
+                    "https://docs.nextcloud.com/server/latest/user_manual/en/files/access_webdav.html"
+                }
+                ProviderId::Local => return Err("La biblioteca local no necesita una API".into()),
+            };
+            if env.open_browser {
+                open_browser(url)?;
+            }
+        }
+        Action::CancelYoutube => youtube::cancel(),
         Action::Downloads => {
             let directory = storage.document_path("cache/audio");
             if directory.exists() {
@@ -2610,6 +2684,7 @@ fn execute_with(
             document.external = enabled;
             save(storage, &document)?;
             if !enabled {
+                youtube::cancel();
                 cancel_pending(None);
             }
         }
@@ -2659,11 +2734,6 @@ fn execute_with(
     snapshot(storage, results, pending_url, downloaded, warnings)
 }
 
-/// Runs one source action against the real storage and credential store.
-pub fn execute(storage: &StorageManager, action: Action) -> Result<Snapshot, String> {
-    execute_with(storage, &OsVault, &Env::default(), action)
-}
-
 #[cfg(test)]
 #[path = "sources_tests.rs"]
 mod tests;
@@ -2671,7 +2741,17 @@ mod tests;
 #[tauri::command]
 pub async fn sources_action(app: tauri::AppHandle, action: Action) -> Result<Snapshot, String> {
     use tauri::Manager;
-    tauri::async_runtime::spawn_blocking(move || execute(&app.state::<StorageManager>(), action))
-        .await
-        .map_err(|error| error.to_string())?
+    let env = Env {
+        youtube_tools: app
+            .path()
+            .resource_dir()
+            .map_err(|error| error.to_string())?
+            .join("tools"),
+        ..Env::default()
+    };
+    tauri::async_runtime::spawn_blocking(move || {
+        execute_with(&app.state::<StorageManager>(), &OsVault, &env, action)
+    })
+    .await
+    .map_err(|error| error.to_string())?
 }

@@ -253,3 +253,15 @@
     transition: none;
   }
 }
+
+.source-guide {
+  padding-left: 1.4rem;
+  max-width: 75ch;
+}
+.resource-results .source-guide > li {
+  display: list-item;
+  margin: 0.6rem 0;
+  padding: 0;
+  border: 0;
+  background: none;
+}

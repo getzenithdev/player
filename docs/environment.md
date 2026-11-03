@@ -2,7 +2,7 @@
 
 ## Framework and Dependencies
 
-- Node.js 24 LTS with npm; the supported major is recorded in `.nvmrc` and `package.json`.
+- Node.js 22 LTS with npm (22.12+; Node 24 is also accepted on newer systems); the supported major is recorded in `.nvmrc` and `package.json`.
 - Tauri 2 with a Rust desktop backend and a React/TypeScript frontend.
 - Vite for frontend development and builds.
 - ESLint with TypeScript and React rules, Prettier, and Vitest.
@@ -52,6 +52,8 @@ Package names differ across distributions; consult the official prerequisites fo
 npm ci
 npm run tauri dev
 ```
+
+The desktop command prepares pinned YouTube helpers automatically on first use; that preparation needs Internet access. On Monterey use Node 22: Node 24 prebuilt binaries require macOS 13.5+. See [youtube-provider.md](youtube-provider.md).
 
 Use `npm install` when intentionally changing dependencies. The development frontend uses port 1420 with a strict port check. `npm run dev` starts only the browser frontend.
 

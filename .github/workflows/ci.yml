@@ -62,8 +62,24 @@ jobs:
         with:
           workspaces: src-tauri -> target
       - run: npm ci
+      - name: Prepare and verify packaged YouTube helpers
+        run: npm run youtube:prepare
+      - name: Smoke-test packaged helper executables
+        shell: bash
+        run: |
+          suffix=""
+          if [ "$RUNNER_OS" = "Windows" ]; then suffix=".exe"; fi
+          "./src-tauri/tools/yt-dlp$suffix" --ignore-config --no-plugin-dirs --version
+          "./src-tauri/tools/node$suffix" --version
       - run: npm run rust:fmt
       - run: npm run rust:lint
       - run: npm run rust:test
       - name: Compile desktop application without publishing
         run: npm run tauri build -- --no-bundle --target ${{ matrix.target }}
+      - name: Verify Monterey deployment metadata (app and helpers)
+        if: runner.os == 'macOS'
+        shell: bash
+        run: |
+          arch="x86_64"
+          if [[ "${{ matrix.target }}" == aarch64* ]]; then arch="arm64"; fi
+          python3 scripts/check-macos-minimum.py --arch "$arch" src-tauri/tools/yt-dlp src-tauri/tools/node src-tauri/target/${{ matrix.target }}/release/zenith-player

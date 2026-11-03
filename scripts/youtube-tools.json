@@ -1,0 +1,30 @@
+{
+  "ytdlp": "2026.10.26",
+  "node": "v22.23.4",
+  "platforms": {
+    "darwin-x64": {
+      "ytdlpFile": "yt-dlp_macos",
+      "ytdlpSha256": "0f922c15ccc0b83eefa1c8bc9104e434318c4bf16e408e1ee93b7745a6efe0aa",
+      "nodeFile": "node-v22.23.4-darwin-x64.tar.gz",
+      "nodeSha256": "efcc2b0db6f94bf53eddb038fe2b370277a042bd29e4f19b8f8e23598795b819"
+    },
+    "darwin-arm64": {
+      "ytdlpFile": "yt-dlp_macos",
+      "ytdlpSha256": "0f922c15ccc0b83eefa1c8bc9104e434318c4bf16e408e1ee93b7745a6efe0aa",
+      "nodeFile": "node-v22.23.4-darwin-arm64.tar.gz",
+      "nodeSha256": "c9e1dbc748b33ed2d14f42445191ecaf14c56259c7a9a26d0042c49ec2b66428"
+    },
+    "linux-x64": {
+      "ytdlpFile": "yt-dlp_linux",
+      "ytdlpSha256": "767ba9dce7052aa196f8b12652f433d76de128ba168966fa84b6394d5e6c6795",
+      "nodeFile": "node-v22.23.4-linux-x64.tar.gz",
+      "nodeSha256": "b8492284c76a54baf58d61668dd0e41ee0fc98adabf9503d30f05d08f55b4406"
+    },
+    "win32-x64": {
+      "ytdlpFile": "yt-dlp.exe",
+      "ytdlpSha256": "f5389d3698ecde4ef06f4e6b1ce0294fe9ac1396228c8990b8d3416d6d177a7d",
+      "nodeFile": "node-v22.23.4-win-x64.zip",
+      "nodeSha256": "cbc74b5e0982c9dbb41525fd8fb5dcd32fbee237863f7829072f4639a1ce5f20"
+    }
+  }
+}

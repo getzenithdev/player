@@ -13,6 +13,7 @@ export default tseslint.config(
       "src-tauri/gen/**",
     ],
   },
+  { files: ["scripts/**/*.mjs"], languageOptions: { globals: globals.node } },
   js.configs.recommended,
   ...tseslint.configs.recommended,
   {

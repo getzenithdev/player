@@ -69,3 +69,10 @@
 - Follow moved library identities, skip missing entries during navigation, and retain missing entries for recovery.
 - Replace preview-only playlists/queue UI with native workflows, library actions and a dedicated history view.
 - Add backend/frontend regression tests and document persistence, interchange, counting rules and desktop acceptance limitations.
+
+## YouTube automático and provider setup guides
+
+- Synchronize the fork with Zenith through `162ad41`, preserving the phase 9 and phase 10 UI work.
+- Add primary keyless YouTube search and AAC/M4A cache preparation through packaged yt-dlp + Node 22, bounded execution and cancellation. Preserve the existing API as a metadata-only alternative.
+- Add provider-specific setup guides and official-site buttons; align Dropbox and OneDrive callbacks with documented desktop registrations.
+- Accept Node 22 for Monterey development and check macOS deployment metadata for the app and helper executables in CI. Actual Monterey runtime acceptance remains pending.
