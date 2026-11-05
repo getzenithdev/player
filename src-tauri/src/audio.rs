@@ -51,6 +51,9 @@ pub use crate::playlists::Entry as TrackSummary;
 pub use crate::session::RepeatMode;
 use crate::{
     audio_persistence::PersistenceWriter,
+    audio_processing::{
+        self, EqualizerSettings, ProcessingShared, ProcessingSnapshot, ProcessingSource,
+    },
     playlists,
     session::{self, SessionState, Visit},
     storage::StorageManager,
@@ -93,6 +96,7 @@ pub struct PlaybackSnapshot {
     pub error: Option<String>,
     pub output_sample_rate: Option<u32>,
     pub output_channels: Option<u16>,
+    pub processing: ProcessingSnapshot,
 }
 
 impl Default for PlaybackSnapshot {
@@ -114,6 +118,7 @@ impl Default for PlaybackSnapshot {
             error: None,
             output_sample_rate: None,
             output_channels: None,
+            processing: ProcessingSnapshot::default(),
         }
     }
 }
@@ -159,6 +164,7 @@ enum AudioCommand {
         play: bool,
     },
     QueueAction(QueueAction),
+    ProcessingUpdated,
     Flush(Sender<Result<(), String>>),
 }
 
@@ -166,13 +172,21 @@ enum AudioCommand {
 pub struct AudioEngine {
     commands: Mutex<Sender<AudioCommand>>,
     snapshot: Arc<Mutex<PlaybackSnapshot>>,
+    processing: Arc<ProcessingShared>,
 }
 
 impl AudioEngine {
     pub fn new(app: AppHandle) -> Self {
         let (sender, receiver) = mpsc::channel();
         let snapshot = Arc::new(Mutex::new(PlaybackSnapshot::default()));
-        let worker = AudioWorker::new(app, Arc::clone(&snapshot), receiver);
+        let settings = audio_processing::load_settings(&app.state::<StorageManager>());
+        let processing = Arc::new(ProcessingShared::new(settings));
+        let worker = AudioWorker::new(
+            app,
+            Arc::clone(&snapshot),
+            Arc::clone(&processing),
+            receiver,
+        );
 
         if let Err(error) = thread::Builder::new()
             .name("zenith-audio".into())
@@ -184,7 +198,21 @@ impl AudioEngine {
         Self {
             commands: Mutex::new(sender),
             snapshot,
+            processing,
         }
+    }
+
+    pub fn processing_snapshot(&self) -> ProcessingSnapshot {
+        self.processing.snapshot()
+    }
+
+    pub fn update_processing(
+        &self,
+        settings: EqualizerSettings,
+    ) -> Result<ProcessingSnapshot, String> {
+        self.processing.update(settings);
+        self.send(AudioCommand::ProcessingUpdated)?;
+        Ok(self.processing.snapshot())
     }
 
     pub fn snapshot(&self) -> PlaybackSnapshot {
@@ -338,12 +366,14 @@ struct AudioWorker {
     restored: bool,
     writer: PersistenceWriter,
     last_checkpoint: std::time::Instant,
+    processing: Arc<ProcessingShared>,
 }
 
 impl AudioWorker {
     fn new(
         app: AppHandle,
         shared: Arc<Mutex<PlaybackSnapshot>>,
+        processing: Arc<ProcessingShared>,
         commands: Receiver<AudioCommand>,
     ) -> Self {
         let writer = PersistenceWriter::new(app.clone());
@@ -377,6 +407,7 @@ impl AudioWorker {
             restored: false,
             writer,
             last_checkpoint: std::time::Instant::now(),
+            processing,
         }
     }
 
@@ -460,6 +491,7 @@ impl AudioWorker {
             AudioCommand::ClearQueue => self.clear_queue(),
             AudioCommand::SetEntries { entries, play } => self.set_entries(entries, play),
             AudioCommand::QueueAction(action) => self.edit_queue(action),
+            AudioCommand::ProcessingUpdated => self.publish(),
             AudioCommand::Flush(reply) => {
                 let _ = reply.send(self.writer.flush(self.checkpoint_state()));
             }
@@ -691,6 +723,9 @@ impl AudioWorker {
         }
         self.last_position = Duration::ZERO;
         self.stalled_ticks = 0;
+        self.processing.set_sample_rate(None);
+        self.processing.set_track_gain(Default::default());
+        self.processing.reset_limiter();
     }
 
     fn start_index(&mut self, index: usize, autoplay: bool, start_at: Option<Duration>) {
@@ -743,8 +778,13 @@ impl AudioWorker {
 
         player.stop();
         let (decoder, info) = decode_file(Path::new(&path))?;
+        let track_gain = audio_processing::read_track_gain(Path::new(&path));
+        self.processing.set_track_gain(track_gain);
+        self.processing.set_sample_rate(Some(info.sample_rate));
+        self.processing.reset_limiter();
+        let source = ProcessingSource::new(decoder, Arc::clone(&self.processing), info.duration);
         player.set_volume(self.effective_volume());
-        player.append(decoder);
+        player.append(source);
 
         let mut position = start_at.unwrap_or(Duration::ZERO);
         if let Some(duration) = info.duration {
@@ -1123,6 +1163,7 @@ impl AudioWorker {
             error: self.error.clone(),
             output_sample_rate: self.output_sample_rate,
             output_channels: self.output_channels,
+            processing: self.processing.snapshot(),
         };
 
         if let Ok(mut shared) = self.shared.lock() {
@@ -1354,6 +1395,22 @@ pub fn audio_restart_output(engine: State<'_, AudioEngine>) -> Result<(), String
 #[tauri::command]
 pub fn audio_clear_queue(engine: State<'_, AudioEngine>) -> Result<(), String> {
     engine.clear_queue()
+}
+
+#[tauri::command]
+pub fn audio_processing_get(engine: State<'_, AudioEngine>) -> ProcessingSnapshot {
+    engine.processing_snapshot()
+}
+
+#[tauri::command]
+pub fn audio_processing_save(
+    app: AppHandle,
+    engine: State<'_, AudioEngine>,
+    settings: EqualizerSettings,
+) -> Result<ProcessingSnapshot, String> {
+    let settings = settings.normalized();
+    audio_processing::save_settings(&app.state::<StorageManager>(), &settings)?;
+    engine.update_processing(settings)
 }
 
 #[tauri::command]

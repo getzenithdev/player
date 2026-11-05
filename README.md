@@ -22,6 +22,10 @@ Phase 11 connects playback to the operating system. Windows uses the System Medi
 
 The audio worker detects a long gap between ticks and rebuilds the output after suspend/resume. Platform coverage, documented limitations, and the pending manual checks are listed in [Native integration and accessibility](docs/native-integration.md).
 
+## Equalizer and Processing
+
+**Ecualizador** provides ten octave bands from 31 Hz to 16 kHz, ten built-in presets, custom curves, preamp, balance, ReplayGain, peak normalization, bounded edge fades, and automatic headroom with a soft limiter. Processing runs on the audio worker thread, so changes apply without stopping playback. Settings and up to 40 custom presets persist in `config/audio.json`; the screen is also linked from **Configuración → Audio**. See [Ten-band equalizer and processing](docs/equalizer.md) for the signal chain, sample-rate behavior, crossfade limitation, tests, and pending platform measurements.
+
 ## Local Music Library
 
 **Biblioteca** supports importing files or multiple folders, searching songs and metadata, grouped views, favorites, history, and playback. Locations are reconciled every ten seconds or on demand. Metadata edits stay internal unless the user explicitly requests writing tags to the original; explicit writes retain a recovery copy. See [Music Library and Local Files](docs/music-library.md) for identity rules, limitations, and desktop acceptance steps.
@@ -89,6 +93,7 @@ GitHub Actions checks the frontend and compiles Windows x64, macOS Intel/Apple S
 - [Product specifications](docs/specs.md)
 - [Environment and commands](docs/environment.md)
 - [Audio engine](docs/audio-engine.md)
+- [Ten-band equalizer and processing](docs/equalizer.md)
 - [Music library and local files](docs/music-library.md)
 - [Universal metadata and identity](docs/metadata-engine.md)
 - [Playlists, queue, and history](docs/playlists-queue.md)

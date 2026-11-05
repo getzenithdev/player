@@ -1,0 +1,384 @@
+.equalizer {
+  display: grid;
+  gap: 20px;
+  min-width: 0;
+}
+
+.eq-hero {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 28px;
+  flex-wrap: wrap;
+  padding: 26px 28px;
+  border: 1px solid var(--line);
+  border-radius: 22px;
+  background:
+    radial-gradient(
+      circle at 12% 0%,
+      color-mix(in srgb, var(--accent) 18%, transparent),
+      transparent 58%
+    ),
+    var(--surface);
+}
+
+.eq-hero-copy {
+  display: grid;
+  gap: 8px;
+  max-width: 64ch;
+}
+
+.eq-hero-copy p {
+  color: var(--muted);
+  font-size: 13px;
+}
+
+.eq-eyebrow {
+  color: var(--accent) !important;
+  font-size: 11px !important;
+  font-weight: 700;
+  letter-spacing: 0.14em;
+  text-transform: uppercase;
+}
+
+.eq-master {
+  display: flex;
+  align-items: flex-start;
+  gap: 12px;
+  min-width: 240px;
+  padding: 14px 18px;
+  border: 1px solid var(--line);
+  border-radius: 16px;
+  background: color-mix(in srgb, var(--accent) 8%, transparent);
+  cursor: pointer;
+}
+
+.eq-master input {
+  margin-top: 2px;
+}
+
+.eq-master span {
+  display: grid;
+  gap: 3px;
+}
+
+.eq-master strong {
+  font-size: 14px;
+}
+
+.eq-master small {
+  color: var(--muted);
+  font-size: 11px;
+  line-height: 1.5;
+}
+
+.eq-body {
+  display: grid;
+  gap: 20px;
+  min-width: 0;
+  margin: 0;
+  padding: 0;
+  border: 0;
+}
+
+.eq-body:disabled {
+  opacity: 0.72;
+}
+
+.eq-preset-bar {
+  display: flex;
+  align-items: flex-end;
+  gap: 14px;
+  flex-wrap: wrap;
+}
+
+.eq-select {
+  display: grid;
+  gap: 6px;
+  min-width: 190px;
+}
+
+.eq-select > span {
+  color: var(--muted);
+  font-size: 11px;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+}
+
+.eq-select select,
+.eq-custom-form input {
+  min-height: 40px;
+  padding: 9px 12px;
+  border: 1px solid var(--line);
+  border-radius: 10px;
+  background: var(--surface);
+  color: var(--text);
+  font: inherit;
+}
+
+.eq-status {
+  margin-left: auto;
+  padding: 7px 13px;
+  border: 1px solid var(--line);
+  border-radius: 999px;
+  color: var(--accent);
+  font-size: 11px;
+  font-weight: 600;
+  letter-spacing: 0.05em;
+  text-transform: uppercase;
+}
+
+.eq-section,
+.eq-custom,
+.eq-diagnostics {
+  display: grid;
+  gap: 16px;
+  padding: 20px;
+  border: 1px solid var(--line);
+  border-radius: 20px;
+  background: var(--surface);
+}
+
+.eq-section-heading {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 16px;
+  flex-wrap: wrap;
+}
+
+.eq-section-heading span {
+  color: var(--muted);
+  font-size: 12px;
+}
+
+.eq-bands {
+  display: grid;
+  grid-template-columns: repeat(10, minmax(48px, 1fr));
+  gap: 8px;
+  min-width: 0;
+}
+
+.eq-band {
+  display: grid;
+  justify-items: center;
+  gap: 8px;
+  padding: 12px 4px 10px;
+  border-radius: 14px;
+  background: color-mix(in srgb, var(--accent) 6%, transparent);
+  transition:
+    background 0.18s ease,
+    opacity 0.18s ease;
+}
+
+.eq-band:hover {
+  background: color-mix(in srgb, var(--accent) 11%, transparent);
+}
+
+.eq-band.unsupported {
+  opacity: 0.4;
+}
+
+.eq-band-gain {
+  color: var(--accent);
+  font-size: 11px;
+  font-variant-numeric: tabular-nums;
+  font-weight: 600;
+  white-space: nowrap;
+}
+
+.eq-band input[type="range"] {
+  width: 26px;
+  height: 168px;
+  margin: 0;
+  writing-mode: vertical-lr;
+  direction: rtl;
+  accent-color: var(--accent);
+  cursor: ns-resize;
+}
+
+.eq-band-hz {
+  font-size: 12px;
+  font-weight: 600;
+}
+
+.eq-band small {
+  color: var(--muted);
+  font-size: 10px;
+}
+
+.eq-hint {
+  color: var(--muted);
+  font-size: 11px;
+  line-height: 1.6;
+}
+
+.eq-control-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(240px, 1fr));
+  gap: 14px;
+}
+
+.eq-card {
+  display: grid;
+  align-content: start;
+  gap: 12px;
+  padding: 18px;
+  border: 1px solid var(--line);
+  border-radius: 18px;
+  background: var(--surface);
+}
+
+.eq-card h3 {
+  font-size: 13px;
+  letter-spacing: 0.01em;
+}
+
+.eq-range {
+  display: grid;
+  gap: 8px;
+}
+
+.eq-range > span {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 12px;
+  color: var(--muted);
+  font-size: 12px;
+}
+
+.eq-range output {
+  color: var(--text);
+  font-size: 12px;
+  font-variant-numeric: tabular-nums;
+  font-weight: 600;
+}
+
+.eq-range input[type="range"] {
+  width: 100%;
+  accent-color: var(--accent);
+}
+
+.eq-check {
+  display: flex;
+  align-items: flex-start;
+  gap: 9px;
+  color: var(--muted);
+  font-size: 12px;
+  line-height: 1.55;
+  cursor: pointer;
+}
+
+.eq-check input {
+  margin-top: 1px;
+}
+
+.eq-custom-form {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  flex-wrap: wrap;
+}
+
+.eq-custom-form input {
+  flex: 1;
+  min-width: 180px;
+}
+
+.eq-custom-list {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 10px;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.eq-custom-list li {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 4px 8px 4px 4px;
+  border: 1px solid var(--line);
+  border-radius: 999px;
+  background: color-mix(in srgb, var(--accent) 6%, transparent);
+}
+
+.eq-chip {
+  padding: 6px 12px;
+  border: 0;
+  border-radius: 999px;
+  background: transparent;
+  color: var(--text);
+  font-size: 12px;
+}
+
+.eq-chip:hover {
+  background: var(--hover);
+  color: var(--accent);
+}
+
+.eq-custom-list .text-button {
+  font-size: 11px;
+}
+
+.eq-diagnostics {
+  background: color-mix(in srgb, var(--accent) 5%, var(--surface));
+}
+
+.eq-stats {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(130px, 1fr));
+  gap: 10px;
+  margin: 0;
+}
+
+.eq-stats div {
+  display: grid;
+  gap: 4px;
+  padding: 12px 14px;
+  border: 1px solid var(--line);
+  border-radius: 12px;
+  background: color-mix(in srgb, var(--canvas) 45%, transparent);
+}
+
+.eq-stats dt {
+  color: var(--muted);
+  font-size: 10px;
+  letter-spacing: 0.05em;
+  text-transform: uppercase;
+}
+
+.eq-stats dd {
+  margin: 0;
+  font-size: 13px;
+  font-variant-numeric: tabular-nums;
+  font-weight: 600;
+}
+
+@media (max-width: 900px) {
+  .eq-bands {
+    grid-template-columns: repeat(5, minmax(48px, 1fr));
+  }
+
+  .eq-status {
+    margin-left: 0;
+  }
+}
+
+@media (max-width: 620px) {
+  .eq-hero {
+    padding: 20px;
+  }
+
+  .eq-section,
+  .eq-custom,
+  .eq-diagnostics {
+    padding: 16px;
+  }
+
+  .eq-band input[type="range"] {
+    height: 132px;
+  }
+}

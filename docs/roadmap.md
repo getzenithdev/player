@@ -356,6 +356,8 @@ Include screen reader support, contrast, scaling, visible focus, keyboard naviga
 
 **Acceptance and testing:** verify band response using reference signals, absence of clipping under defined conditions, uninterrupted parameter changes, and preset restoration. Measure processing load in the target environments.
 
+**Implementation notes:** phase 12 is implemented in `src-tauri/src/audio_processing.rs` as a Rodio source wrapper with ten RBJ peaking biquads, ten built-in presets, custom-preset persistence, preamp, balance, ReplayGain/normalization, bounded edge fades, and a soft limiter with automatic headroom. Settings and custom presets share `config/audio.json`; live changes use a revision counter and never restart playback. The interface adds an **Ecualizador** screen plus a link from **Configuración → Audio**. Crossfade is implemented as a bounded edge fade rather than overlapping decoders, and gapless/speed remain unexposed. Automated DSP, parser, persistence, and configuration tests pass; installed-platform listening and CPU measurements remain pending. See [equalizer.md](equalizer.md) for the signal chain, limits, and acceptance checklist. Tracked as "En pruebas".
+
 ## Phase 13. Settings and Preferences
 
 **Objective:** centralize and persist application settings.

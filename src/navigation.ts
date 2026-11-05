@@ -10,6 +10,7 @@ export const navigation = [
   { view: "history", label: "Historial", group: "library" },
   { view: "downloads", label: "Descargas", group: "collection" },
   { view: "sources", label: "Fuentes", group: "collection" },
+  { view: "equalizer", label: "Ecualizador", group: "settings" },
   { view: "settings", label: "Configuración", group: "settings" },
 ] as const;
 export type AppView =

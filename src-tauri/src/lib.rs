@@ -1,6 +1,7 @@
 mod artwork;
 mod audio;
 mod audio_persistence;
+mod audio_processing;
 mod commands;
 mod library;
 mod library_commands;
@@ -106,6 +107,8 @@ pub fn run() {
             audio::audio_set_shuffle,
             audio::audio_restart_output,
             audio::audio_clear_queue,
+            audio::audio_processing_get,
+            audio::audio_processing_save,
             audio::audio_capabilities,
             native::integration_get,
             native::integration_save,

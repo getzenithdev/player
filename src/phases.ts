@@ -172,7 +172,7 @@ export const phases: Phase[] = [
     objective:
       "Aplicar procesamiento sin cortes, saturación ni bloqueos de interfaz.",
     view: "equalizer",
-    status: "Pendiente",
+    status: "En pruebas",
     checks: [
       "Comprobar las diez bandas con señales de referencia.",
       "Aplicar presets, preamplificación y balance sin cortes.",

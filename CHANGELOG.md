@@ -1,5 +1,13 @@
 # Changelog
 
+## Unreleased — Phase 12
+
+- Add a ten-band equalizer (31 Hz–16 kHz), ten built-in presets, custom curves, preamp, balance, ReplayGain, peak normalization, and bounded edge fades.
+- Apply processing inside a Rodio source wrapper so live changes replace coefficients without stopping, reloading, or blocking playback.
+- Add automatic headroom and a soft limiter, bypass bands above the sample-rate Nyquist margin, and expose applied gain/limiter diagnostics.
+- Persist settings and up to 40 custom presets in `config/audio.json`; add the **Ecualizador** screen and a link from **Configuración → Audio**.
+- Cover DSP response, clipping protection, sample-rate support, preset persistence, parser compatibility, and configuration clamping with Rust and frontend tests; document pending listening and CPU acceptance in `docs/equalizer.md`.
+
 ## Unreleased — Phase 11
 
 - Add OS media controls through `souvlaki` (Windows SMTC, Linux MPRIS, macOS Now Playing), global media keys, track notifications, a tray/menu-bar icon, and launch at login.

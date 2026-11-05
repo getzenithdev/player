@@ -27,6 +27,7 @@ import { Artwork } from "./ArtworkPanel";
 import { Lyrics } from "./LyricsPanel";
 import { ListeningHistory } from "./ListeningHistory";
 import { Sources } from "./SourcesPanel";
+import { Equalizer } from "./EqualizerPanel";
 import { Settings } from "./SettingsPanel";
 import { Home, Search, Downloads } from "./MusicScreens";
 import { PlayerBar } from "./PlayerBar";
@@ -278,6 +279,8 @@ export default function App() {
         );
       case "downloads":
         return <Downloads audio={audio} navigate={navigate} />;
+      case "equalizer":
+        return <Equalizer audio={audio} />;
       case "settings":
         return (
           <Settings
@@ -285,6 +288,7 @@ export default function App() {
             theme={theme}
             onTheme={(next) => void changeTheme(next)}
             onSources={() => navigate("sources")}
+            onEqualizer={() => navigate("equalizer")}
             integration={integration}
             integrationSnapshot={integrationSnapshot}
             onIntegration={(next) => void changeIntegration(next)}

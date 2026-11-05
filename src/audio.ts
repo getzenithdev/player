@@ -1,4 +1,5 @@
 import type { MediaEntry, QueueAction } from "./playlists";
+import { defaultProcessing, type ProcessingSnapshot } from "./equalizer";
 import { invoke } from "@tauri-apps/api/core";
 import { listen, type UnlistenFn } from "@tauri-apps/api/event";
 import { open } from "@tauri-apps/plugin-dialog";
@@ -28,6 +29,7 @@ export interface PlaybackSnapshot {
   error: string | null;
   outputSampleRate: number | null;
   outputChannels: number | null;
+  processing: ProcessingSnapshot;
 }
 
 export interface AudioCapabilities {
@@ -60,6 +62,7 @@ export const emptySnapshot: PlaybackSnapshot = {
   error: null,
   outputSampleRate: null,
   outputChannels: null,
+  processing: defaultProcessing,
 };
 
 function isTauriRuntime(): boolean {

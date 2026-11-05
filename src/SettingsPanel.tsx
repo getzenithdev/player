@@ -65,6 +65,7 @@ export function Settings({
   onTheme,
   audio,
   onSources,
+  onEqualizer,
   integration = defaultIntegrationSettings,
   integrationSnapshot = null,
   onIntegration,
@@ -73,6 +74,7 @@ export function Settings({
   onTheme: (theme: string) => void;
   audio: AudioController;
   onSources: () => void;
+  onEqualizer: () => void;
   integration?: IntegrationSettings;
   integrationSnapshot?: IntegrationSnapshot | null;
   onIntegration: (settings: IntegrationSettings) => void;
@@ -515,9 +517,17 @@ export function Settings({
             >
               <span className="status">Audio local</span>
             </Setting>
+            <Setting
+              title="Ecualizador y procesamiento"
+              description="Diez bandas, presets, preamplificación, balance, ReplayGain, normalización y fundido entre pistas."
+            >
+              <button className="button" onClick={onEqualizer}>
+                Abrir ecualizador
+              </button>
+            </Setting>
             <p className="inline-note">
-              El ecualizador y el procesamiento avanzado de sonido estarán
-              disponibles en una próxima actualización.
+              El procesamiento se aplica en tiempo real y se guarda en la
+              configuración local. Desactívalo para escuchar la señal original.
             </p>
           </>
         )}

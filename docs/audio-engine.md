@@ -1,6 +1,6 @@
 # Audio Engine (Phase 3)
 
-The audio engine provides offline playback of local files. It is implemented in `src-tauri/src/audio.rs` and exposed to the interface through Tauri commands and events. The interface can open audio files, control playback, and inspect the current state; the music library, metadata, persistent queue, and audio processing remain later phases.
+The audio engine provides offline playback of local files. It is implemented in `src-tauri/src/audio.rs` and exposed to the interface through Tauri commands and events. The interface can open audio files, control playback, and inspect the current state; the music library, metadata, and persistent queue belong to later phases, while ten-band processing is implemented in phase 12.
 
 ## Selection
 
@@ -34,19 +34,20 @@ React interface
 - `AudioEngine` keeps a command sender and an `Arc<Mutex<PlaybackSnapshot>>`.
 - The worker opens the default output device at startup. If that fails, the application still starts and the snapshot reports an error.
 - Every track is decoded through Rodio with byte length and seek support. The decoder exposes duration, sample rate, and channel count before playback.
+- When processing is enabled, the decoded source is wrapped by `ProcessingSource`, which applies the ten-band curve, static gain, balance, edge fades, and limiter on the audio worker thread. Settings changes only replace coefficients; the player is not stopped or reloaded.
 - The worker polls the player position every 200 ms, detects the end of a track, applies repeat/shuffle, and emits position events while playing.
 - A stalled output (for example after system sleep or a device change) is detected when the position does not advance for about four seconds. The worker recreates the output and resumes the current track at the last position, up to two consecutive attempts. The interface also exposes a manual **Reiniciar salida** action.
 
 ## Controls and State
 
-Commands: `audio_get_state`, `audio_open_files`, `audio_play_index`, `audio_play`, `audio_pause`, `audio_toggle`, `audio_stop`, `audio_next`, `audio_previous`, `audio_seek`, `audio_set_volume`, `audio_set_muted`, `audio_set_repeat`, `audio_set_shuffle`, `audio_restart_output`, `audio_clear_queue`, and `audio_capabilities`.
+Commands: `audio_get_state`, `audio_open_files`, `audio_play_index`, `audio_play`, `audio_pause`, `audio_toggle`, `audio_stop`, `audio_next`, `audio_previous`, `audio_seek`, `audio_set_volume`, `audio_set_muted`, `audio_set_repeat`, `audio_set_shuffle`, `audio_restart_output`, `audio_clear_queue`, `audio_processing_get`, `audio_processing_save`, and `audio_capabilities`.
 
 Events:
 
 - `audio:state` sends the complete playback snapshot after every state change.
 - `audio:position` sends `{ positionMs, durationMs, status }` while playing.
 
-The snapshot exposes the status (`idle`, `loading`, `playing`, `paused`, `stopped`, `error`), current track, position, duration, sample rate, channels, format, volume, mute, repeat, shuffle, queue, current index, error message, and the output configuration. Track titles currently come from the file name; tags, artwork, and stable metadata identities belong to phases 4 and 6.
+The snapshot exposes the status (`idle`, `loading`, `playing`, `paused`, `stopped`, `error`), current track, position, duration, sample rate, channels, format, volume, mute, repeat, shuffle, queue, current index, error message, output configuration, and the applied processing settings plus diagnostics. Track titles currently come from the file name; tags, artwork, and stable metadata identities belong to phases 4 and 6.
 
 ## Format Matrix
 
@@ -81,7 +82,8 @@ The generated WAV unit test in `audio.rs` checks decoding metadata and duration 
 ## Known Limitations
 
 - Opus is not supported by the selected decoder.
-- Gapless playback, crossfade, balance, speed, ReplayGain, normalization, equalization, and output-device selection are prepared but implemented in phase 12.
+- Gapless playback and speed are not exposed yet. Crossfade, balance, ReplayGain, normalization, and the ten-band equalizer are implemented in phase 12; see [equalizer.md](equalizer.md).
+- Output-device selection is not implemented; playback uses the system default device and recovers by recreating it.
 - Phase 5 adds persistent independent queue editing, playlists, session restoration without autoplay, and listening history. See [playlists-queue.md](playlists-queue.md).
 - Tags, embedded artwork, and library identity belong to phases 4 and 6.
 - Native media keys, system media controls, notifications, and the suspend/resume heuristic are implemented in phase 11; see [native-integration.md](native-integration.md).
