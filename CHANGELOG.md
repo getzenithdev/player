@@ -1,5 +1,13 @@
 # Changelog
 
+## Unreleased — Phase 13
+
+- Add a centralized settings center with validated defaults, autosave, explicit save/reset, and local persistence.
+- Apply accent, scale, motion, background, player layout, lyric styling, and playback defaults; preserve restored sessions.
+- Mirror shared lyric/artwork preferences, honor provider selection and artwork priority, and retain later edits from module screens.
+- Expose cache cleanup, backup, import/export, and connected-source management without collecting credentials or telemetry.
+- Add preference validation and persistence regression coverage; document scope and desktop acceptance in `docs/preferences.md`.
+
 ## Unreleased — Phase 12
 
 - Add a ten-band equalizer (31 Hz–16 kHz), ten built-in presets, custom curves, preamp, balance, ReplayGain, peak normalization, and bounded edge fades.

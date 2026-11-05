@@ -378,6 +378,8 @@ Include screen reader support, contrast, scaling, visible focus, keyboard naviga
 
 **Acceptance and testing:** save, restart, and restore settings; reject invalid values and verify that each control applies its effect. Verify that clearing the cache does not delete the library, playlists, or original files.
 
+**Implementation notes:** phase 13 provides a centralized settings center, versioned `config/settings.json`, validation, defaults, live appearance preferences, playback defaults, lyric-provider selection, artwork priority, and module-preference synchronization. Storage and privacy actions reuse the existing safe local APIs. Native integration and DSP retain their operational documents. See [preferences.md](preferences.md) for scope, verification, and installed-platform acceptance. Tracked as "En pruebas" until manual acceptance is recorded.
+
 ## Phase 14. Automatic Updates
 
 **Objective:** distribute verified releases and offer updates within the application.
@@ -505,4 +507,4 @@ Minimum task template:
 - Blockers:
 ```
 
-No remote tasks have been created. Phases 1–9 are validated by the user as recorded above. Phase 10 is in testing. Subsequent phases remain pending; the product interface no longer exposes development phase reviews.
+No remote tasks have been created. Phases 1–9 are validated by the user as recorded above. Phase 10 is in testing. Phases 11–13 are implemented and in testing; phases 14–16 remain pending; the product interface no longer exposes development phase reviews.

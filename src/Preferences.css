@@ -1,0 +1,206 @@
+/*
+ * Phase 13 preferences. Appearance options are applied to <html> as data
+ * attributes so they persist across routes and do not depend on a component
+ * staying mounted. Theme keeps its existing `App`/appearance.json contract.
+ */
+
+:root {
+  --ui-scale: 1;
+  --ui-inverse-scale: 1;
+  --pref-accent: #d0afe5;
+  --pref-accent-light: #80509d;
+}
+
+:root[data-accent="violet"] {
+  --pref-accent: #d0afe5;
+  --pref-accent-light: #80509d;
+}
+
+:root[data-accent="plum"] {
+  --pref-accent: #c48fd6;
+  --pref-accent-light: #74458a;
+}
+
+:root[data-accent="rose"] {
+  --pref-accent: #eda6bc;
+  --pref-accent-light: #a94f68;
+}
+
+:root[data-accent="teal"] {
+  --pref-accent: #8fd6cf;
+  --pref-accent-light: #2f6f69;
+}
+
+:root[data-accent="amber"] {
+  --pref-accent: #e9c48c;
+  --pref-accent-light: #8a6224;
+}
+
+:root[data-accent] .workspace {
+  --accent: var(--pref-accent);
+  --accent-soft: color-mix(in srgb, var(--pref-accent) 16%, transparent);
+}
+
+:root[data-accent] .workspace[data-theme="light"] {
+  --accent: var(--pref-accent-light);
+  --accent-soft: color-mix(in srgb, var(--pref-accent-light) 12%, transparent);
+}
+
+@media (prefers-color-scheme: light) {
+  :root[data-accent] .workspace[data-theme="system"] {
+    --accent: var(--pref-accent-light);
+    --accent-soft: color-mix(
+      in srgb,
+      var(--pref-accent-light) 12%,
+      transparent
+    );
+  }
+}
+
+:root[data-animations="reduced"] *,
+:root[data-animations="reduced"] *::before,
+:root[data-animations="reduced"] *::after {
+  animation: none !important;
+  transition: none !important;
+  scroll-behavior: auto !important;
+}
+
+:root[data-background="solid"] .listening-hero::before,
+:root[data-background="solid"] .now-stage {
+  background: none;
+}
+
+:root[data-player-layout="compact"] .workspace {
+  grid-template-rows: minmax(0, 1fr) 86px;
+}
+
+:root[data-player-layout="compact"] .player-bar {
+  padding-block: 8px;
+}
+
+:root[data-lyrics-style="focus"] .lyric-lines {
+  font-size: calc(var(--lyric-size, 30px) * 1.15);
+  line-height: 1.95;
+}
+
+:root[data-lyrics-style="focus"] .lyric-lines p:not(.active) {
+  opacity: 0.42;
+}
+
+:root[data-lyrics-style="lyrics"] .now-stage {
+  grid-template-columns: minmax(120px, 220px) minmax(0, 1fr);
+}
+
+:root[data-ui-scale]:not([data-ui-scale="100"]) .workspace {
+  width: calc(100% * var(--ui-inverse-scale));
+  height: calc(100dvh * var(--ui-inverse-scale));
+  transform: scale(var(--ui-scale));
+  transform-origin: top left;
+}
+
+.preference-section {
+  display: grid;
+  gap: 4px;
+}
+
+.preference-section > h2 {
+  margin-bottom: 8px;
+}
+
+.preference-note {
+  margin: 4px 0 10px;
+  color: var(--muted);
+  font-size: 12px;
+}
+
+.preference-inline {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  min-width: 180px;
+}
+
+.preference-inline input[type="range"] {
+  width: 150px;
+}
+
+.preference-inline output,
+.preference-value {
+  min-width: 52px;
+  color: var(--muted);
+  font-size: 12px;
+  text-align: right;
+}
+
+.preference-colors {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+
+.preference-colors label {
+  align-items: center;
+  display: flex;
+  gap: 6px;
+  font-size: 12px;
+  color: var(--muted);
+}
+
+.preference-colors input[type="color"] {
+  background: transparent;
+  border: 0;
+  height: 24px;
+  padding: 0;
+  width: 34px;
+}
+
+.preference-checks {
+  display: grid;
+  gap: 6px;
+}
+
+.preference-checks label {
+  align-items: center;
+  display: flex;
+  gap: 8px;
+  font-size: 13px;
+}
+
+.preference-order {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.preference-order li {
+  border: 1px solid var(--line);
+  border-radius: 999px;
+  color: var(--muted);
+  font-size: 12px;
+  padding: 3px 9px;
+}
+
+.preference-footer {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 10px;
+  margin-top: 18px;
+  padding-top: 14px;
+  border-top: 1px solid var(--line);
+}
+
+.preference-footer .preference-status {
+  color: var(--muted);
+  font-size: 12px;
+  margin-right: auto;
+}
+
+@media (max-width: 720px) {
+  .preference-inline input[type="range"] {
+    width: 100px;
+  }
+}

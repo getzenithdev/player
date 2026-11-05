@@ -94,6 +94,7 @@ GitHub Actions checks the frontend and compiles Windows x64, macOS Intel/Apple S
 - [Environment and commands](docs/environment.md)
 - [Audio engine](docs/audio-engine.md)
 - [Ten-band equalizer and processing](docs/equalizer.md)
+- [Settings and preferences](docs/preferences.md)
 - [Music library and local files](docs/music-library.md)
 - [Universal metadata and identity](docs/metadata-engine.md)
 - [Playlists, queue, and history](docs/playlists-queue.md)

@@ -16,6 +16,7 @@ import {
   loadStorageStatus,
   type StorageStatus,
 } from "./storage";
+import { SettingsCenter } from "./SettingsCenter";
 
 function Setting({
   title,
@@ -79,7 +80,7 @@ export function Settings({
   integrationSnapshot?: IntegrationSnapshot | null;
   onIntegration: (settings: IntegrationSettings) => void;
 }) {
-  const [tab, setTab] = useState("Apariencia");
+  const [tab, setTab] = useState("Preferencias");
   const [status, setStatus] = useState<StorageStatus | null>(null);
   const [busy, setBusy] = useState(false);
   const [notice, setNotice] = useState("");
@@ -112,6 +113,7 @@ export function Settings({
     }
   }
   const tabs = [
+    "Preferencias",
     "Apariencia",
     "Sistema",
     "Accesibilidad",
@@ -163,6 +165,14 @@ export function Settings({
         role="tabpanel"
         aria-labelledby={`setting-tab-${tabs.indexOf(tab)}`}
       >
+        {tab === "Preferencias" && (
+          <SettingsCenter
+            audio={audio}
+            theme={theme}
+            onTheme={onTheme}
+            onSources={onSources}
+          />
+        )}
         {tab === "Apariencia" && (
           <>
             <Setting

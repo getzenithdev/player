@@ -184,7 +184,7 @@ export const phases: Phase[] = [
     name: "Configuración",
     objective: "Centralizar, validar y conservar todas las preferencias.",
     view: "settings",
-    status: "Pendiente",
+    status: "En pruebas",
     checks: [
       "Guardar y restaurar los ajustes de cada sección.",
       "Rechazar valores inválidos y comprobar su efecto real.",

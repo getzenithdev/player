@@ -267,6 +267,20 @@ fn load(storage: &StorageManager) -> Result<Document, String> {
         .map(|d| d.map(|d| d.data).unwrap_or_default())
         .map_err(|e| e.to_string())
 }
+/// Global presentation preferences, shared with the settings center (phase 13).
+pub fn load_preferences(storage: &StorageManager) -> Result<Preferences, String> {
+    Ok(load(storage)?.preferences)
+}
+/// Validates and stores the global preferences without touching track choices.
+pub fn save_preferences(storage: &StorageManager, preferences: Preferences) -> Result<(), String> {
+    preferences.validate()?;
+    let _lock = storage.library_lock();
+    let mut doc = load(storage)?;
+    doc.preferences = preferences;
+    storage
+        .save_document(DOCUMENT, &doc)
+        .map_err(|e| e.to_string())
+}
 fn candidate(provider: &str, raw: String, track: &TrackEntry) -> Result<Candidate, String> {
     let parsed = parse(&raw)?;
     Ok(Candidate {
@@ -456,6 +470,15 @@ pub fn execute(
     }
     let _lock = storage.library_lock();
     let mut doc = load(storage)?;
+    if matches!(&action, Action::Snapshot | Action::Search { .. }) {
+        let providers = crate::settings::load(storage)?.settings.lyrics.providers;
+        candidates.retain(|candidate| providers.contains(&candidate.provider));
+        candidates.sort_by_key(|candidate| {
+            providers
+                .iter()
+                .position(|provider| provider == &candidate.provider)
+        });
+    }
     let saved = doc.tracks.entry(track_id.clone()).or_default();
     let mut changed = true;
     match action {

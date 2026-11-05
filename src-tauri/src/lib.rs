@@ -12,6 +12,7 @@ mod playlist_commands;
 mod playlists;
 mod resources;
 mod session;
+mod settings;
 mod sources;
 mod storage;
 
@@ -89,6 +90,9 @@ pub fn run() {
             commands::storage_import,
             commands::storage_clear_cache,
             commands::storage_search,
+            settings::settings_get,
+            settings::settings_save,
+            settings::settings_reset,
             audio::audio_queue_action,
             audio::audio_open_entries,
             audio::audio_get_state,

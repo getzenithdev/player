@@ -103,6 +103,20 @@ fn load(s: &StorageManager) -> Result<Document, String> {
         .map(|d| d.map(|d| d.data).unwrap_or_default())
         .map_err(|e| e.to_string())
 }
+/// Global presentation preferences, shared with the settings center (phase 13).
+pub fn load_preferences(s: &StorageManager) -> Result<Preferences, String> {
+    Ok(load(s)?.preferences)
+}
+/// Stores the global preferences without touching saved artwork.
+pub fn save_preferences(s: &StorageManager, preferences: Preferences) -> Result<(), String> {
+    if !["thumbnail", "preview"].contains(&preferences.quality.as_str()) {
+        return Err("Calidad inválida".into());
+    }
+    let _lock = s.library_lock();
+    let mut doc = load(s)?;
+    doc.preferences = preferences;
+    s.save_document(DOCUMENT, &doc).map_err(|e| e.to_string())
+}
 fn bounded_file(path: &Path) -> Result<Vec<u8>, String> {
     let f = fs::File::open(path).map_err(|e| e.to_string())?;
     if !f.metadata().map_err(|e| e.to_string())?.is_file() {
@@ -258,6 +272,7 @@ fn local_manifest(path: String, t: &TrackEntry) -> Manifest {
         permitted_storage: true,
     }
 }
+#[cfg(test)]
 pub fn priority(a: &Asset) -> u8 {
     match (a.provider.as_str(), a.animated) {
         ("apple-music", true) => 0,
@@ -267,6 +282,19 @@ pub fn priority(a: &Asset) -> u8 {
         _ => 4,
     }
 }
+fn configured_priority(
+    asset: &Asset,
+    providers: &[String],
+) -> (usize, bool, std::cmp::Reverse<u32>) {
+    (
+        providers
+            .iter()
+            .position(|provider| provider == &asset.provider)
+            .unwrap_or(providers.len()),
+        !asset.animated,
+        std::cmp::Reverse(asset.score),
+    )
+}
 fn resolve(s: &StorageManager, doc: &Document, track: &TrackEntry) -> Option<Asset> {
     let assets = doc.tracks.get(&track.id)?;
     let available = |a: &&Asset| image_path(s, &a.id, "preview").is_ok_and(|p| p.is_file());
@@ -275,10 +303,15 @@ fn resolve(s: &StorageManager, doc: &Document, track: &TrackEntry) -> Option<Ass
     {
         return Some(a.clone());
     }
+    let providers = crate::settings::load(s)
+        .ok()?
+        .settings
+        .artwork
+        .provider_priority;
     assets
         .iter()
         .filter(available)
-        .min_by_key(|a| (priority(a), std::cmp::Reverse(a.score)))
+        .min_by_key(|a| configured_priority(a, &providers))
         .cloned()
 }
 fn local(s: &StorageManager, t: &TrackEntry) -> Vec<Asset> {
@@ -673,7 +706,8 @@ pub fn execute(s: &StorageManager, track_id: String, action: Action) -> Result<S
     }
     let resolved = resolve(s, &doc, &track);
     let mut candidates = search.unwrap_or_else(|| doc.tracks.remove(&track_id).unwrap_or_default());
-    candidates.sort_by_key(|a| (priority(a), std::cmp::Reverse(a.score)));
+    let providers = crate::settings::load(s)?.settings.artwork.provider_priority;
+    candidates.sort_by_key(|a| configured_priority(a, &providers));
     Ok(Snapshot {
         resolved,
         candidates,

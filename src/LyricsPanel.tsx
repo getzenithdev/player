@@ -216,11 +216,11 @@ export function Lyrics({
         className={`resources lyrics-engine lyrics-immersive${preferences.mode === "karaoke" ? " immersive-karaoke" : ""}`}
         style={
           {
-            "--lyric-color": candidate?.parsed.lines.some((l) => l.at !== null)
-              ? "#ffffff50"
-              : "#d9dae1",
-            "--lyric-active": "#fff",
-            "--lyric-size": "clamp(22px, 2.6vw, 36px)",
+            "--lyric-color": preferences.color,
+            "--lyric-active": preferences.active_color,
+            "--lyric-size": `${preferences.size}px`,
+            fontFamily:
+              preferences.font === "system" ? "inherit" : preferences.font,
           } as CSSProperties
         }
       >
