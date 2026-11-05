@@ -196,7 +196,7 @@ export const phases: Phase[] = [
     name: "Actualizaciones",
     objective: "Distribuir y verificar versiones por plataforma y canal.",
     view: "settings",
-    status: "Pendiente",
+    status: "En pruebas",
     checks: [
       "Detectar y aplicar una versión de prueba conservando los datos.",
       "Rechazar firmas inválidas y paquetes incompatibles.",

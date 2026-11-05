@@ -40,6 +40,7 @@ pub fn run() {
             tauri_plugin_autostart::MacosLauncher::LaunchAgent,
             Some(vec!["--hidden"]),
         ))
+        .plugin(tauri_plugin_updater::Builder::new().build())
         .manage(storage)
         .setup(|app| {
             // The audio worker opens the output device in the background so a

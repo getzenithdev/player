@@ -33,6 +33,14 @@ import {
   loadStorageStatus,
   type StorageStatus,
 } from "./storage";
+import {
+  checkForUpdate,
+  getUpdateChannel,
+  installUpdate,
+  saveUpdateChannel,
+  type AvailableUpdate,
+  type UpdateChannel,
+} from "./updater";
 
 const sections = [
   "General",
@@ -124,6 +132,11 @@ export function SettingsCenter({
   const [notice, setNotice] = useState("");
   const [error, setError] = useState("");
   const [status, setStatus] = useState<StorageStatus | null>(null);
+  const [updateChannel, setUpdateChannel] =
+    useState<UpdateChannel>(getUpdateChannel);
+  const [availableUpdate, setAvailableUpdate] =
+    useState<AvailableUpdate | null>(null);
+  const [updateProgress, setUpdateProgress] = useState<number | null>(null);
   const initialTheme = useRef(theme);
   const themeRef = useRef(theme);
   const onThemeRef = useRef(onTheme);
@@ -172,6 +185,29 @@ export function SettingsCenter({
       disposed = true;
     };
   }, []);
+
+  useEffect(() => {
+    if (!ready) return;
+    let disposed = false;
+    void checkForUpdate(updateChannel)
+      .then((available) => {
+        if (!disposed) setAvailableUpdate(available);
+      })
+      .catch(() => {
+        if (!disposed)
+          setNotice("No se pudo comprobar si hay actualizaciones.");
+      });
+    return () => {
+      disposed = true;
+    };
+  }, [ready, updateChannel]);
+
+  useEffect(
+    () => () => {
+      void availableUpdate?.update.close();
+    },
+    [availableUpdate],
+  );
 
   const persist = useCallback(async (value: AppSettings) => {
     const current = ++revision.current;
@@ -409,9 +445,76 @@ export function SettingsCenter({
             </Row>
             <Row
               title="Actualizaciones"
-              description="La comprobación automática estará disponible en una próxima actualización."
+              description="Las versiones se descargan desde GitHub Releases y se verifican antes de instalarse."
             >
-              <span className="status">Pendiente de distribución</span>
+              <div className="button-group">
+                <select
+                  aria-label="Canal de actualizaciones"
+                  value={updateChannel}
+                  disabled={busy}
+                  onChange={(event) => {
+                    const channel = event.target.value as UpdateChannel;
+                    setUpdateChannel(channel);
+                    saveUpdateChannel(channel);
+                    setAvailableUpdate(null);
+                  }}
+                >
+                  <option value="stable">Estable</option>
+                  <option value="beta">Beta</option>
+                </select>
+                <button
+                  className="button"
+                  type="button"
+                  disabled={busy}
+                  onClick={() =>
+                    void run(async () => {
+                      const available = await checkForUpdate(updateChannel);
+                      setAvailableUpdate(available);
+                      return available
+                        ? `Versión ${available.update.version} disponible.`
+                        : "Ya tienes la versión más reciente.";
+                    })
+                  }
+                >
+                  Buscar
+                </button>
+                {availableUpdate && (
+                  <>
+                    <button
+                      className="button"
+                      type="button"
+                      disabled={busy}
+                      onClick={() => {
+                        void (async () => {
+                          setBusy(true);
+                          setError("");
+                          setUpdateProgress(0);
+                          try {
+                            await installUpdate(
+                              availableUpdate,
+                              setUpdateProgress,
+                            );
+                          } catch (reason) {
+                            setError(String(reason));
+                          } finally {
+                            setBusy(false);
+                            setUpdateProgress(null);
+                          }
+                        })();
+                      }}
+                    >
+                      {updateProgress === null
+                        ? "Instalar"
+                        : `Descargando ${updateProgress} %`}
+                    </button>
+                    {availableUpdate.update.body && (
+                      <span className="status">
+                        Notas: {availableUpdate.update.body}
+                      </span>
+                    )}
+                  </>
+                )}
+              </div>
             </Row>
           </>
         )}

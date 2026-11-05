@@ -32,6 +32,7 @@ import { Settings } from "./SettingsPanel";
 import { Home, Search, Downloads } from "./MusicScreens";
 import { PlayerBar } from "./PlayerBar";
 import { ExpandedPlayer } from "./ExpandedPlayer";
+import { checkForUpdate } from "./updater";
 import { useMusicLibrary } from "./useMusicLibrary";
 import { libraryAction, type LibraryView } from "./library";
 import "./App.css";
@@ -140,6 +141,25 @@ export default function App() {
     const timer = window.setTimeout(() => setNativeNotice(""), 6000);
     return () => window.clearTimeout(timer);
   }, [nativeNotice]);
+  useEffect(() => {
+    let disposed = false;
+    void checkForUpdate()
+      .then(async (available) => {
+        if (!disposed && available) {
+          const version = available.update.version;
+          await available.update.close();
+          setNativeNotice(`Hay una actualización disponible: ${version}.`);
+        } else {
+          await available?.update.close();
+        }
+      })
+      .catch(() => {
+        // The settings screen reports errors for explicit checks.
+      });
+    return () => {
+      disposed = true;
+    };
+  }, []);
   const trackTitle = audio.state.track?.title ?? null;
   const trackArtist = audio.state.track?.artist ?? null;
   const trackAlbum = audio.state.track?.album ?? null;

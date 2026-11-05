@@ -398,6 +398,13 @@ Include screen reader support, contrast, scaling, visible focus, keyboard naviga
 
 **Acceptance and testing:** update from an earlier test version while preserving data; reject invalid signatures; test network failures, interrupted downloads, incompatible versions, and correct channel selection.
 
+**Implementation notes:** the Tauri updater is configured for signed GitHub
+Release artifacts and target-aware manifests. Preferences expose Stable and
+Beta channels, startup/manual checks, release notes, download progress and
+restart-after-install. See [updates.md](updates.md) for signing, package
+formats, migration and recovery; installed-platform acceptance remains
+pending a signed CI release.
+
 ## Phase 15. Testing, Optimization, and Quality Assurance
 
 **Objective:** validate modules and their interactions before release. Testing starts within each phase and is consolidated here.

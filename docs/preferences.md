@@ -14,7 +14,7 @@ The settings center is available under Configuración → Preferencias. Seven se
 
 Native startup, close behavior, session restoration, shortcuts, and accessibility remain in Sistema/Accesibilidad. DSP remains in Audio/Ecualizador, persisted independently in config/audio.json. Portable mode is displayed from actual storage status and remains an explicit startup choice.
 
-The interface currently ships in Spanish. System-language preference is reserved for future translations. Automatic updates belong to phase 14; selectable output devices, gapless playback, and overlapping crossfade remain engine limitations. There is no telemetry collector or quality selector for sources that do not expose one. Cache size limits and automatic eviction are not implemented; usage and manual cleanup are available.
+The interface currently ships in Spanish. System-language preference is reserved for future translations. Automatic updates use the signed Stable/Beta feeds described in [updates.md](updates.md); selectable output devices, gapless playback, and overlapping crossfade remain engine limitations. There is no telemetry collector or quality selector for sources that do not expose one. Cache size limits and automatic eviction are not implemented; usage and manual cleanup are available.
 
 ## Validation
 
