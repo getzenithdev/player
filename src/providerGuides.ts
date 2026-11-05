@@ -23,7 +23,7 @@ export const providerGuides: Record<ProviderId, ProviderGuide> = {
       "Activa Permitir consultas externas. La aplicación incluye los componentes de búsqueda y extracción; no necesitas crear una clave ni iniciar sesión.",
       "Elige YouTube automático en el buscador y escribe un título o artista.",
       "Pulsa Reproducir. Primero se prepara el audio M4A en la caché y después comienza la reproducción; la primera carga puede tardar.",
-      "Si falla, prueba otro resultado o actualiza la aplicación. Si tienes una clave configurada, YouTube API permite buscar metadatos como alternativa, pero no ofrece audio.",
+      "Si falla, prueba otro resultado o actualiza la aplicación. Si tienes una clave configurada, YouTube API permite buscar como alternativa. La reproducción usa el mismo motor de YouTube automático.",
     ],
     note: "No se importan cookies del navegador. Algunos videos, directos o contenidos restringidos no estarán disponibles. Usa contenido con los permisos necesarios y respeta las condiciones de la fuente.",
   },
@@ -37,7 +37,7 @@ export const providerGuides: Record<ProviderId, ProviderGuide> = {
       "Edita la clave y restringe las APIs permitidas a YouTube Data API v3. Las restricciones de sitio web no corresponden a esta aplicación de escritorio.",
       "Copia la clave en Clave de la API, activa las consultas externas y pulsa Conectar. Selecciona YouTube API para buscar.",
     ],
-    note: "Solo búsqueda y metadatos, sujeto a la cuota de tu proyecto. La clave se guarda en el almacén de credenciales del sistema. No la publiques en GitHub.",
+    note: "La búsqueda usa la cuota de tu proyecto. Pulsa Reproducir en un resultado para preparar el audio mediante YouTube automático; la API no entrega audio. La clave se guarda en el almacén de credenciales del sistema. No la publiques en GitHub.",
   },
   "google-drive": {
     title: "Crear las credenciales de Google Drive",

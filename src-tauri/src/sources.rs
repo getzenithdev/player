@@ -181,6 +181,8 @@ struct Document {
     external: bool,
     connections: BTreeMap<ProviderId, Connection>,
     settings: BTreeMap<ProviderId, ProviderSettings>,
+    /// Completed cache files explicitly requested with Download, keyed by filename.
+    downloads: BTreeMap<String, String>,
 }
 
 /// One browsable or searchable item returned by a provider.
@@ -274,6 +276,11 @@ pub enum Action {
     Download {
         provider: ProviderId,
         id: String,
+        name: Option<String>,
+    },
+    Prepare {
+        provider: ProviderId,
+        id: String,
     },
 }
 
@@ -301,9 +308,9 @@ fn registry() -> Vec<ProviderInfo> {
             id: ProviderId::Youtube,
             name: ProviderId::Youtube.label().into(),
             auth: AuthKind::ApiKey,
-            capabilities: vec![Capability::Auth, Capability::Search, Capability::Read],
+            capabilities: vec![Capability::Auth, Capability::Search, Capability::Read, Capability::Playback],
             required: vec!["api_key".into()],
-            note: "Opción alternativa: YouTube Data API con clave propia para búsqueda y metadatos; no proporciona audio ni sustituye la extracción cuando falla."
+            note: "YouTube Data API con clave propia para búsqueda y metadatos. Reproducir prepara el audio mediante YouTube automático; la API no entrega audio y las restricciones de extracción siguen aplicándose."
                 .into(),
         },
         ProviderInfo {
@@ -2267,7 +2274,7 @@ fn youtube_search(
         entries.push(Entry {
             provider: ProviderId::Youtube,
             id: id.to_string(),
-            name: title,
+            name: youtube_title(&title),
             kind: "video".into(),
             detail: channel,
             size: None,
@@ -2307,6 +2314,42 @@ fn youtube_search(
 }
 
 // --- downloads ---------------------------------------------------------------
+
+/// Remove presentation labels, preserving musical versions such as live/remix.
+fn youtube_title(title: &str) -> String {
+    let mut cleaned = title.trim();
+    loop {
+        let lower = cleaned.to_lowercase();
+        let labels = [
+            "audio",
+            "official audio",
+            "official video",
+            "official music video",
+            "music video",
+            "lyrics",
+            "lyric video",
+            "official lyric video",
+            "visualizer",
+        ];
+        let suffix = labels
+            .iter()
+            .flat_map(|label| [format!("({label})"), format!("[{label}]")])
+            .find(|suffix| lower.ends_with(suffix));
+        match suffix {
+            Some(suffix) => cleaned = cleaned[..cleaned.len() - suffix.len()].trim(),
+            None => break,
+        }
+    }
+    let song = [" - ", " – ", " — "]
+        .iter()
+        .find_map(|separator| cleaned.split_once(separator).map(|(_, song)| song.trim()))
+        .unwrap_or(cleaned);
+    if song.is_empty() {
+        title.trim().into()
+    } else {
+        song.into()
+    }
+}
 
 const AUDIO_EXTENSIONS: &[&str] = &["mp3", "flac", "wav", "ogg", "m4a", "aac", "aiff", "caf"];
 
@@ -2654,6 +2697,7 @@ fn execute_with(
         }
         Action::CancelYoutube => youtube::cancel(),
         Action::Downloads => {
+            let saved = load(storage)?.downloads;
             let directory = storage.document_path("cache/audio");
             if directory.exists() {
                 for item in std::fs::read_dir(&directory)
@@ -2662,13 +2706,16 @@ fn execute_with(
                 {
                     let path = item.path();
                     let name = item.file_name().to_string_lossy().to_string();
-                    if !item.file_type().is_ok_and(|kind| kind.is_file()) || !is_audio_name(&name) {
+                    if !saved.contains_key(&name)
+                        || !item.file_type().is_ok_and(|kind| kind.is_file())
+                        || !is_audio_name(&name)
+                    {
                         continue;
                     }
                     results.push(Entry {
                         provider: ProviderId::Local,
                         id: path.to_string_lossy().to_string(),
-                        name,
+                        name: saved.get(&name).cloned().unwrap_or(name),
                         kind: "audio".into(),
                         detail: "Descarga guardada".into(),
                         size: item.metadata().ok().map(|metadata| metadata.len()),
@@ -2724,11 +2771,39 @@ fn execute_with(
             ensure_external(storage)?;
             results = browse(storage, store, env, provider, path)?;
         }
-        Action::Download { provider, id } => {
+        Action::Prepare { provider, id } => {
             if provider != ProviderId::Local {
                 ensure_external(storage)?;
             }
-            downloaded = Some(download(storage, store, env, provider, &id)?);
+            let playback_provider = if provider == ProviderId::Youtube {
+                ProviderId::YoutubeAuto
+            } else {
+                provider
+            };
+            downloaded = Some(download(storage, store, env, playback_provider, &id)?);
+        }
+        Action::Download { provider, id, name } => {
+            if provider != ProviderId::Local {
+                ensure_external(storage)?;
+            }
+            let path = download(storage, store, env, provider, &id)?;
+            if provider != ProviderId::Local {
+                let filename = Path::new(&path)
+                    .file_name()
+                    .and_then(|value| value.to_str())
+                    .ok_or("Nombre de descarga inválido")?
+                    .to_string();
+                let _lock = storage.library_lock();
+                let mut document = load(storage)?;
+                let label = name
+                    .filter(|name| !name.trim().is_empty())
+                    .unwrap_or_else(|| filename.clone());
+                document
+                    .downloads
+                    .insert(filename, label.chars().take(512).collect());
+                save(storage, &document)?;
+            }
+            downloaded = Some(path);
         }
     }
     snapshot(storage, results, pending_url, downloaded, warnings)

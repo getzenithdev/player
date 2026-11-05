@@ -8,7 +8,7 @@ Every provider implements the same contract in `src-tauri/src/sources.rs`: a dec
 | --- | --- | --- | --- |
 | Local | none | search, read, playback | Library and playback without network. |
 | YouTube automático (primary) | none | search, read, playback, download | Local yt-dlp + Node 22, audio prepared as AAC/M4A cache files. |
-| YouTube API (alternative) | API key | auth, search, read | Metadata only; existing credentials preserved. |
+| YouTube API (alternative) | API key | auth, search, read, playback | Search via API; playback via the automatic audio engine. |
 | Google Drive | OAuth 2.0 + PKCE | auth, search, read, playback, download, revoke | User-supplied `client_id`, scope `drive.readonly`. |
 | Dropbox | OAuth 2.0 + PKCE | auth, search, read, playback, download, revoke | User-supplied `client_id`, scopes `files.metadata.read files.content.read account_info.read`. |
 | OneDrive | OAuth 2.0 + PKCE | auth, search, read, playback, download | User-supplied `client_id`, scope `Files.Read offline_access`; disconnect locally and remove consent in the Microsoft account. |
@@ -16,11 +16,11 @@ Every provider implements the same contract in `src-tauri/src/sources.rs`: a dec
 
 Connection states are `disconnected`, `pending`, `connected`, `expired`, `revoked` and `error`. See [youtube-provider.md](youtube-provider.md) for extraction, packaging, limitations and Monterey checks.
 
-One Tauri command, `sources_action`, receives an action enum tagged `kind` in camelCase (`snapshot`, `external`, `settings`, `connect`, `finish`, `disconnect`, `revoke`, `search`, `browse`, `download`) and always returns the full `Snapshot`: providers, results, external flag, pending authorization URL, last download path and warnings.
+One Tauri command, `sources_action`, receives an action enum tagged `kind` in camelCase (`snapshot`, `external`, `settings`, `connect`, `finish`, `disconnect`, `revoke`, `search`, `browse`, `prepare`, `download`, `downloads`) and always returns the full `Snapshot`: providers, results, external flag, pending authorization URL, last download path and warnings.
 
 ## Connections and secrets
 
-`config/providers.json` is the same protected document the storage export already excludes. It stores connections (state, account label, endpoint, expiry, `has_secret`), the non-secret settings the user typed (`client_id`, `endpoint`, `username`) and the external opt-in. It never stores a credential: passwords, API keys, client secrets and tokens are serialized only into the credential store through `keyring::Entry::new("Zenith Player", provider)`. Tests use an in-memory `SecretStore`, so no platform keyring service is required to run them.
+`config/providers.json` is the same protected document the storage export already excludes. It stores connections (state, account label, endpoint, expiry, `has_secret`), the non-secret settings the user typed (`client_id`, `endpoint`, `username`), the external opt-in, and filenames/titles explicitly requested with Download. It never stores a credential: passwords, API keys, client secrets and tokens are serialized only into the credential store through `keyring::Entry::new("Zenith Player", provider)`. Tests use an in-memory `SecretStore`, so no platform keyring service is required to run them.
 
 ## Network rules
 
@@ -51,7 +51,7 @@ Downloads are stored once under `cache/audio/` with a content-derived name and a
 
 **Fuentes** shows the opt-in switch, a card per provider with its capabilities, state, account label or endpoint, expiry, last error and the required connection fields (secrets are masked, the address is validated by the browser before it is sent). A pending authorization shows the URL and **Ya lo autoricé, continuar**. Searching picks a source, browsing opens folders, and each result offers the actions its provider declares. Warnings are listed instead of blocking the rest of the screen. The browser preview has no Tauri commands, so actions report the unavailable command and local library use stays in the other screens.
 
-Saved non-secret connection fields prefill reconnect forms; successfully submitted secrets are cleared from the form state. Expired or failed connections can be disconnected to forget credentials. Folders offer browsing, files offer downloading, and only audio entries offer playback.
+Saved non-secret connection fields prefill reconnect forms; successfully submitted secrets are cleared from the form state. Expired or failed connections can be disconnected to forget credentials. Folders offer browsing, files offer downloading, and audio entries and YouTube API video results offer playback. The latter use the automatic YouTube audio engine.
 
 ## Tests and acceptance
 
@@ -65,7 +65,7 @@ Validation recorded on Windows x64, 2026-11-02: `npm run check` passed (28 front
 
 La fase 9 conecta servicios externos mediante un contrato común: cada proveedor declara sus capacidades y la interfaz solo ofrece las acciones que declara. Las contraseñas, claves y tokens viven en el almacén de credenciales del sistema; `config/providers.json` guarda únicamente conexiones y ajustes, y la exportación de datos nunca lo incluye. Las consultas externas siguen desactivadas hasta que las permites explícitamente.
 
-YouTube automático es la opción principal, sin clave, con búsqueda y preparación de audio AAC/M4A mediante yt-dlp local. YouTube API queda como alternativa independiente de búsqueda y metadatos con tu propia clave, sin reproducción ni descarga. Google Drive, Dropbox y OneDrive usan OAuth 2.0 con PKCE y tu propio ID de cliente, con autorización en el navegador y caducidad gestionada; WebDAV exige HTTPS con usuario y contraseña. Las descargas se guardan en la caché local y se reproducen con el motor de audio, de modo que la biblioteca local sigue funcionando con la red caída o las autorizaciones caducadas. Falta la aceptación manual con credenciales reales en las aplicaciones instaladas.
+YouTube automático es la opción principal, sin clave, con búsqueda y preparación de audio AAC/M4A mediante yt-dlp local. YouTube API queda como alternativa independiente de búsqueda y metadatos con tu propia clave, con reproducción mediante el motor automático y sin descarga desde la API. Google Drive, Dropbox y OneDrive usan OAuth 2.0 con PKCE y tu propio ID de cliente, con autorización en el navegador y caducidad gestionada; WebDAV exige HTTPS con usuario y contraseña. Las descargas se guardan en la caché local y se reproducen con el motor de audio, de modo que la biblioteca local sigue funcionando con la red caída o las autorizaciones caducadas. Falta la aceptación manual con credenciales reales en las aplicaciones instaladas.
 
 ## Setup guides
 

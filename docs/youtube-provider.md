@@ -10,10 +10,11 @@ standalone executable. No API key, Google account or self-hosted server is
 required. External requests still require explicit user opt-in.
 
 `youtube` remains the independent **YouTube API (alternativa)** provider. Its
-existing ID, credentials and metadata-only capabilities are preserved. The UI
+existing ID and credentials are preserved. The UI
 lets a user retry a failed automatic search with the configured API; this is
-not an audio fallback. API results remain video entries without playback or
-download actions.
+not an audio fallback. API results offer playback through the same automatic
+audio preparation engine. The API itself does not deliver audio and does not
+bypass extractor restrictions. API downloads are not offered.
 
 The first selectable search target is YouTube automático. With external access
 disabled the action remains disabled; local search is still selectable.
@@ -90,8 +91,8 @@ Manual acceptance on macOS 12 Intel and Apple Silicon still requires:
    test content; pause, resume and seek.
 3. Cancel search/download, test loss of network and confirm temporary cleanup.
 4. Replay cached audio and local library content offline.
-5. Configure the API alternative and verify metadata search without audio
-   controls; connect the other providers using the built-in guides.
+5. Configure the API alternative, search and play a result through the automatic
+   audio engine; connect the other providers using the built-in guides.
 
 ### Source permissions
 
@@ -107,6 +108,20 @@ Node 22 incluidos con la aplicación. La búsqueda es ligera y el audio AAC/M4A 
 prepara en caché antes de reproducir. La API de YouTube queda como alternativa
 independiente para búsqueda y metadatos, conservando las claves ya guardadas.
 Las guías paso a paso están dentro de **Fuentes → Proveedores**.
+
+Los resultados de la API también permiten Reproducir mediante YouTube
+automático. Ambos buscadores limpian títulos como
+`Kanye West - Hurricane (Audio)` a `Hurricane`, conservando etiquetas musicales
+como `(Live)` o `(Remix)`. En Buscar, pulsa Enter o **Buscar también en servicios**
+para consultar las fuentes disponibles; si la API está conectada se elige para
+YouTube y se evita duplicar el catálogo con YouTube automático.
+
+Reproducir usa la acción `prepare` y no registra una descarga del usuario.
+Solo `download` registra archivos terminados en `config/providers.json`.
+Descargas consulta ese registro y verifica que el archivo siga existiendo;
+los M4A de reproducción y los archivos parciales quedan fuera. Los archivos
+de caché anteriores no se clasifican automáticamente como descargas: vuelve
+a pulsar Descargar en los que quieras incluir; se reutiliza el audio disponible.
 
 La configuración y los ejecutables se eligen para macOS Monterey, pero la
 aceptación real en macOS 12 sigue pendiente hasta ejecutar los flujos en ese

@@ -355,7 +355,7 @@ fn each_provider_declares_only_the_capabilities_it_implements() {
     assert_eq!(local.auth, AuthKind::None);
 
     let youtube = spec(ProviderId::Youtube);
-    assert!(!youtube.capabilities.contains(&Capability::Playback));
+    assert!(youtube.capabilities.contains(&Capability::Playback));
     assert!(!youtube.capabilities.contains(&Capability::Download));
     assert!(!youtube.capabilities.contains(&Capability::Revoke));
     assert!(youtube.capabilities.contains(&Capability::Search));
@@ -728,6 +728,7 @@ fn webdav_download_is_stored_once_for_the_audio_engine() {
             Action::Download {
                 provider: ProviderId::Webdav,
                 id: "canciones/Nocturne.mp3".into(),
+                name: None,
             },
         )
         .expect("download");
@@ -746,6 +747,7 @@ fn webdav_download_is_stored_once_for_the_audio_engine() {
             Action::Download {
                 provider: ProviderId::Webdav,
                 id: "canciones/Nocturne.mp3".into(),
+                name: None,
             },
         )
         .expect("cached download");
@@ -762,6 +764,7 @@ fn webdav_download_is_stored_once_for_the_audio_engine() {
             Action::Download {
                 provider: ProviderId::Youtube,
                 id: "dQw4w9WgXcQ".into(),
+                name: None,
             },
         )
         .expect_err("youtube downloads are not offered");
@@ -1258,6 +1261,15 @@ fn downloaded_audio_is_available_offline_and_excludes_unfinished_files() {
     std::fs::create_dir_all(&directory).unwrap();
     std::fs::write(directory.join("saved.mp3"), AUDIO_BYTES).unwrap();
     std::fs::write(directory.join("unfinished.tmp"), AUDIO_BYTES).unwrap();
+    std::fs::write(directory.join("youtube-BaW_jenozKc.m4a"), AUDIO_BYTES).unwrap();
+    let mut document = load(&f.storage).unwrap();
+    document
+        .downloads
+        .insert("saved.mp3".into(), "saved.mp3".into());
+    document
+        .downloads
+        .insert("missing.mp3".into(), "Missing".into());
+    save(&f.storage, &document).unwrap();
     std::fs::create_dir_all(directory.join("folder.wav")).unwrap();
     let snapshot = f
         .run(&plain_env(), Action::Downloads)
@@ -1267,6 +1279,73 @@ fn downloaded_audio_is_available_offline_and_excludes_unfinished_files() {
     assert_eq!(snapshot.results[0].name, "saved.mp3");
     assert!(Path::new(&snapshot.results[0].id).is_file());
     assert!(f.vault.entries.lock().unwrap().is_empty());
+}
+
+#[test]
+fn youtube_titles_keep_song_names_and_musical_versions() {
+    assert_eq!(youtube_title("Kanye West - Hurricane (Audio)"), "Hurricane");
+    assert_eq!(youtube_title("Artist – Song [Official Video]"), "Song");
+    assert_eq!(
+        youtube_title("Artist - Song (Live) (Official Audio)"),
+        "Song (Live)"
+    );
+    assert_eq!(youtube_title("Artist - Song (Remix)"), "Song (Remix)");
+    assert_eq!(youtube_title("Hurricane"), "Hurricane");
+    assert_eq!(
+        youtube_title("Artist - Song - Part II (Audio)"),
+        "Song - Part II"
+    );
+}
+
+#[test]
+fn api_playback_uses_youtube_cache_and_only_explicit_download_is_listed() {
+    let _guard = serial();
+    let f = Fixture::new();
+    let env = plain_env();
+    let id = "BaW_jenozKc";
+    let directory = f.storage.document_path("cache/audio");
+    std::fs::create_dir_all(&directory).unwrap();
+    let file = directory.join(format!("youtube-{id}.m4a"));
+    let audio = STANDARD
+        .decode(include_str!("../tests/fixtures/aac.m4a.base64").trim())
+        .unwrap();
+    std::fs::write(&file, audio).unwrap();
+    assert!(
+        f.run(
+            &env,
+            Action::Prepare {
+                provider: ProviderId::Youtube,
+                id: id.into()
+            }
+        )
+        .is_err()
+    );
+    f.enable_external(&env);
+    let prepared = f
+        .run(
+            &env,
+            Action::Prepare {
+                provider: ProviderId::Youtube,
+                id: id.into(),
+            },
+        )
+        .unwrap();
+    assert_eq!(prepared.downloaded.as_deref(), file.to_str());
+    assert!(f.run(&env, Action::Downloads).unwrap().results.is_empty());
+    f.run(
+        &env,
+        Action::Download {
+            provider: ProviderId::YoutubeAuto,
+            id: id.into(),
+            name: Some("Hurricane".into()),
+        },
+    )
+    .unwrap();
+    f.run(&env, Action::External { enabled: false }).unwrap();
+    let entries = f.run(&env, Action::Downloads).unwrap().results;
+    assert_eq!(entries.len(), 1);
+    assert_eq!(entries[0].name, "Hurricane");
+    assert_eq!(entries[0].id, file.to_string_lossy());
 }
 
 #[test]

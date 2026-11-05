@@ -2,6 +2,7 @@ import { useEffect, useState } from "react";
 import type { AudioController } from "./audio";
 import { Icon } from "./Icon";
 import { TrackArtwork } from "./TrackArtwork";
+import { ExternalSearchResults } from "./ExternalSearchResults";
 import { groupIdentity, groupKey, type LibraryTrack } from "./library";
 import {
   albumGroups,
@@ -9,9 +10,13 @@ import {
   playableTracks,
   searchMusic,
 } from "./musicViews";
-import { entryFromTrack, usePlaylists } from "./playlists";
+import { entryFromPath, entryFromTrack, usePlaylists } from "./playlists";
 import type { AppView } from "./navigation";
-import { sourcesAction, type SourceEntry } from "./sources";
+import {
+  searchExternalSources,
+  sourcesAction,
+  type SourceEntry,
+} from "./sources";
 
 type ScreenProps = {
   audio: AudioController;
@@ -242,6 +247,11 @@ export function Search({
   onAlbum: (query: string, view: AppView) => void;
 }) {
   const [filter, setFilter] = useState("Todo");
+  const [submitted, setSubmitted] = useState<{
+    query: string;
+    revision: number;
+    search: ReturnType<typeof searchExternalSources> | null;
+  }>({ query: "", revision: 0, search: null });
   const lists = usePlaylists();
   const matched = searchMusic(tracks, query);
   const albums = albumGroups(matched);
@@ -255,17 +265,36 @@ export function Search({
     : [];
   return (
     <section className="search-screen">
-      <label className="large-search">
-        <Icon name="search" size={24} />
-        <input
-          autoFocus
-          type="search"
-          value={query}
-          onChange={(e) => onQuery(e.target.value)}
-          placeholder="¿Qué quieres escuchar?"
-          aria-label="Buscar música"
-        />
-      </label>
+      <form
+        onSubmit={(event) => {
+          event.preventDefault();
+          if (audio.available && query.trim())
+            setSubmitted({
+              query: query.trim(),
+              revision: submitted.revision + 1,
+              search: searchExternalSources(query.trim()),
+            });
+        }}
+      >
+        <label className="large-search">
+          <Icon name="search" size={24} />
+          <input
+            autoFocus
+            type="search"
+            value={query}
+            onChange={(e) => onQuery(e.target.value)}
+            placeholder="¿Qué quieres escuchar?"
+            aria-label="Buscar música"
+          />
+        </label>
+        <button
+          className="button"
+          type="submit"
+          disabled={!audio.available || !query.trim()}
+        >
+          Buscar también en servicios
+        </button>
+      </form>
       <div className="filter-pills" aria-label="Filtrar búsqueda">
         {["Todo", "Canciones", "Álbumes", "Artistas", "Listas"].map((item) => (
           <button
@@ -280,15 +309,18 @@ export function Search({
       {!query.trim() ? (
         <div className="search-invitation">
           <Icon name="search" size={42} />
-          <h2>Busca en tu biblioteca</h2>
-          <p>Canciones, artistas, álbumes y listas.</p>
+          <h2>Busca tu música</h2>
+          <p>
+            Canciones, artistas, álbumes y listas. Pulsa Enter para consultar
+            también tus servicios.
+          </p>
         </div>
       ) : (
         <>
           {!matched.length && !playlists.length && (
             <div className="library-empty">
-              <h2>Sin coincidencias para “{query}”</h2>
-              <p>Prueba con otro nombre o consulta tus fuentes conectadas.</p>
+              <h2>Sin coincidencias locales para “{query}”</h2>
+              <p>Prueba con otro nombre o busca también en tus servicios.</p>
             </div>
           )}
           {["Todo", "Canciones"].includes(filter) && !!matched.length && (
@@ -361,6 +393,16 @@ export function Search({
               </div>
             </section>
           )}
+          {audio.available &&
+            submitted.search &&
+            submitted.query === query.trim() &&
+            ["Todo", "Canciones"].includes(filter) && (
+              <ExternalSearchResults
+                key={submitted.revision}
+                search={submitted.search}
+                audio={audio}
+              />
+            )}
           <button
             className="external-search-link"
             onClick={() => navigate("sources")}
@@ -404,7 +446,8 @@ export function Downloads({
   return (
     <section>
       <p className="page-description">
-        Disponible sin conexión. Se elimina al limpiar la caché.
+        Canciones que elegiste descargar, disponibles sin conexión. Se eliminan
+        al limpiar la caché.
       </p>
       {loading && <p role="status">Cargando descargas…</p>}
       {error && <p role="alert">{error}</p>}
@@ -426,7 +469,11 @@ export function Downloads({
           <button
             className="discovery-song"
             key={entry.id}
-            onClick={() => void audio.openFiles([entry.id])}
+            onClick={() =>
+              void audio.openEntries([
+                { ...entryFromPath(entry.id), title: entry.name },
+              ])
+            }
           >
             <Icon name="music" />
             <span className="song-info">

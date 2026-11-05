@@ -67,6 +67,53 @@ export const emptySources: SourcesSnapshot = {
 export const sourcesAction = (action: object): Promise<SourcesSnapshot> =>
   invoke("sources_action", { action });
 
+/** Prefer the configured API for YouTube search, avoiding duplicate catalogs. */
+export function searchableExternalProviders(snapshot: SourcesSnapshot) {
+  if (!snapshot.external) return [];
+  const providers = snapshot.providers.filter(
+    (provider) =>
+      provider.id !== "local" &&
+      canQuery(provider) &&
+      hasCapability(provider, "search"),
+  );
+  const hasYoutubeApi = providers.some((provider) => provider.id === "youtube");
+  return providers.filter(
+    (provider) => !hasYoutubeApi || provider.id !== "youtube-auto",
+  );
+}
+
+export async function searchExternalSources(query: string) {
+  let snapshot: SourcesSnapshot;
+  try {
+    snapshot = await sourcesAction({ kind: "snapshot" });
+  } catch (reason) {
+    return {
+      providers: [],
+      results: [],
+      warnings: [String(reason)],
+      external: true,
+    };
+  }
+  const providers = searchableExternalProviders(snapshot);
+  const results: SourceEntry[] = [];
+  const warnings: string[] = [];
+  // The native YouTube helper allows one operation at a time.
+  for (const provider of providers) {
+    try {
+      const next = await sourcesAction({
+        kind: "search",
+        provider: provider.id,
+        query,
+      });
+      results.push(...next.results);
+      warnings.push(...next.warnings);
+    } catch (reason) {
+      warnings.push(`${provider.name}: ${String(reason)}`);
+    }
+  }
+  return { providers, results, warnings, external: snapshot.external };
+}
+
 export const capabilityLabels: Record<Capability, string> = {
   auth: "Autorización",
   search: "Búsqueda",
@@ -140,7 +187,10 @@ export function canDisconnect(provider: ProviderStatus): boolean {
 
 export function entryActions(provider: ProviderStatus, entry: SourceEntry) {
   return {
-    play: entry.kind === "audio" && hasCapability(provider, "playback"),
+    play:
+      (entry.kind === "audio" ||
+        (entry.provider === "youtube" && entry.kind === "video")) &&
+      hasCapability(provider, "playback"),
     download: entry.kind !== "folder" && hasCapability(provider, "download"),
   };
 }

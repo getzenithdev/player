@@ -57,8 +57,8 @@ export function Sources({
       setBusy(true);
       const operation = action as { kind?: string; provider?: ProviderId };
       setYoutubeBusy(
-        operation.provider === "youtube-auto" &&
-          ["search", "download"].includes(operation.kind ?? ""),
+        ["youtube-auto", "youtube"].includes(operation.provider ?? "") &&
+          ["search", "download", "prepare"].includes(operation.kind ?? ""),
       );
       setError("");
       try {
@@ -141,7 +141,7 @@ export function Sources({
 
   async function play(entry: SourceEntry) {
     const next = await load({
-      kind: "download",
+      kind: "prepare",
       provider: entry.provider,
       id: entry.id,
     });
@@ -207,7 +207,7 @@ export function Sources({
               void load({ kind: "search", provider: "youtube", query });
             }}
           >
-            Buscar con YouTube API (solo metadatos)
+            Buscar con YouTube API
           </button>
         )}
 
@@ -499,6 +499,7 @@ export function Sources({
                             kind: "download",
                             provider: entry.provider,
                             id: entry.id,
+                            name: entry.name,
                           })
                         }
                       >

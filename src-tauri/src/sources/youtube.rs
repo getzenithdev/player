@@ -202,7 +202,7 @@ fn parse_results(raw: &[u8]) -> Result<Vec<Entry>, String> {
         entries.push(Entry {
             provider: ProviderId::YoutubeAuto,
             id: id.into(),
-            name: title.chars().take(512).collect(),
+            name: super::youtube_title(title).chars().take(512).collect(),
             kind: "audio".into(),
             detail: channel.chars().take(256).collect(),
             size: None,

@@ -1,4 +1,5 @@
-import { expect, it } from "vitest";
+import { expect, it, vi } from "vitest";
+import { invoke } from "@tauri-apps/api/core";
 import {
   canConnect,
   canDisconnect,
@@ -10,9 +11,13 @@ import {
   formatSize,
   hasCapability,
   stateHint,
+  searchableExternalProviders,
+  searchExternalSources,
   type ProviderStatus,
   type SourceState,
 } from "./sources";
+
+vi.mock("@tauri-apps/api/core", () => ({ invoke: vi.fn() }));
 
 function provider(patch: Partial<ProviderStatus> = {}): ProviderStatus {
   return {
@@ -194,4 +199,78 @@ it("keeps automatic YouTube usable without a connection form or API key", () => 
       },
     ),
   ).toEqual({ play: false, download: false });
+});
+
+it("plays API video results through the preparation action without offering API downloads", () => {
+  expect(
+    entryActions(
+      provider({ id: "youtube", capabilities: ["search", "read", "playback"] }),
+      {
+        provider: "youtube",
+        id: "BaW_jenozKc",
+        name: "Test",
+        kind: "video",
+        detail: "",
+        size: null,
+        source_url: null,
+      },
+    ),
+  ).toEqual({ play: true, download: false });
+});
+
+it("searches available external services once and respects external opt-in", () => {
+  const snapshot = {
+    ...emptySources,
+    external: true,
+    providers: [
+      provider({ id: "local", state: "connected" }),
+      provider({ id: "youtube-auto", state: "connected" }),
+      provider({ id: "youtube", state: "connected" }),
+      provider({ id: "webdav", state: "connected" }),
+      provider({ id: "dropbox", state: "expired" }),
+    ],
+  };
+  expect(searchableExternalProviders(snapshot).map((item) => item.id)).toEqual([
+    "youtube",
+    "webdav",
+  ]);
+  expect(searchableExternalProviders({ ...snapshot, external: false })).toEqual(
+    [],
+  );
+  expect(
+    searchableExternalProviders({
+      ...snapshot,
+      providers: snapshot.providers.filter((item) => item.id !== "youtube"),
+    }).map((item) => item.id),
+  ).toEqual(["youtube-auto", "webdav"]);
+});
+
+it("preserves other services' results when one external search fails", async () => {
+  const entry = {
+    provider: "webdav",
+    id: "song.mp3",
+    name: "Song",
+    kind: "audio",
+    detail: "",
+    size: null,
+    source_url: null,
+  };
+  vi.mocked(invoke).mockReset();
+  vi.mocked(invoke)
+    .mockResolvedValueOnce({
+      ...emptySources,
+      external: true,
+      providers: [
+        provider({ id: "youtube", state: "connected" }),
+        provider({ id: "webdav", state: "connected" }),
+      ],
+    })
+    .mockRejectedValueOnce(new Error("Quota"))
+    .mockResolvedValueOnce({ ...emptySources, results: [entry] });
+  const result = await searchExternalSources("Song");
+  expect(result.results).toEqual([entry]);
+  expect(result.warnings[0]).toContain("Quota");
+  expect(invoke).toHaveBeenLastCalledWith("sources_action", {
+    action: { kind: "search", provider: "webdav", query: "Song" },
+  });
 });
