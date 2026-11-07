@@ -2,7 +2,7 @@
 
 ## Framework and Dependencies
 
-- Node.js 22 LTS with npm (22.12+; Node 24 is also accepted on newer systems); the supported major is recorded in `.nvmrc` and `package.json`.
+- Node.js 22 LTS with pnpm 10.33.4 (22.12+; Node 24 is also accepted on newer systems); the supported major is recorded in `.nvmrc` and `package.json`.
 - Tauri 2 with a Rust desktop backend and a React/TypeScript frontend.
 - Vite for frontend development and builds.
 - ESLint with TypeScript and React rules, Prettier, and Vitest.
@@ -11,7 +11,7 @@
 - Rodio 0.23 with Symphonia 0.5.5 for local decoding and CPAL 0.18 for audio output, as documented in [audio-engine.md](audio-engine.md).
 - The Tauri dialog plugin for selecting local audio files.
 
-JavaScript dependencies are installed locally in the repository. The Tauri CLI is a development dependency, so no global CLI installation is required. Commit `package-lock.json` and `src-tauri/Cargo.lock` to retain dependency resolution.
+JavaScript dependencies are installed locally in the repository. The Tauri CLI is a development dependency, so no global CLI installation is required. Commit `pnpm-lock.yaml` and `src-tauri/Cargo.lock` to retain dependency resolution.
 
 No database, server, or external provider dependency is required. The audio engine from phase 3 is local and works offline; library, lyrics, artwork, and provider integrations are selected in their roadmap phases.
 
@@ -49,37 +49,42 @@ Package names differ across distributions; consult the official prerequisites fo
 ## Install and Run
 
 ```sh
-npm ci
-npm run tauri dev
+npm install --global pnpm@10.33.4
+pnpm install --frozen-lockfile
+pnpm run tauri dev
 ```
 
 The desktop command prepares pinned YouTube helpers automatically on first use; that preparation needs Internet access. On Monterey use Node 22: Node 24 prebuilt binaries require macOS 13.5+. See [youtube-provider.md](youtube-provider.md).
 
-Use `npm install` when intentionally changing dependencies. The development frontend uses port 1420 with a strict port check. `npm run dev` starts only the browser frontend.
+The npm command above is only for installing pnpm itself. `package.json` pins pnpm 10.33.4 for local development and CI; use that version if managing pnpm through Corepack or another version manager. The JavaScript implementation of pnpm 10 runs on the existing Node 22 environment, including Monterey.
+
+When migrating an existing npm checkout, stop running development processes and remove its old `node_modules` directory before the pnpm installation. Do not recreate `package-lock.json`; `pnpm-lock.yaml` is the sole JavaScript lockfile.
+
+Use `pnpm add <package>` (or `pnpm add -D <package>`) to add dependencies and `pnpm install` after intentionally editing dependency declarations. Commit the updated manifest and lockfile together. The development frontend uses port 1420 with a strict port check. `pnpm run dev` starts only the browser frontend.
 
 ## Quality Tools
 
 | Command | Purpose |
 | --- | --- |
-| `npm run typecheck` | Check application and Vite configuration types. |
-| `npm run lint` | Run ESLint and reject warnings. |
-| `npm run format` | Format source and configuration files. |
-| `npm run format:check` | Check formatting without writing files. |
-| `npm test` | Run Vitest; an empty suite is allowed during scaffolding. |
-| `npm run test:watch` | Run Vitest in watch mode. |
-| `npm run check` | Run frontend types, lint, formatting, and tests. |
-| `npm run rust:check` | Check the native Rust project. |
-| `npm run rust:fmt` | Check Rust formatting. |
-| `npm run rust:lint` | Run Clippy with warnings treated as errors. |
-| `npm run rust:test` | Run Rust tests. |
+| `pnpm run typecheck` | Check application and Vite configuration types. |
+| `pnpm run lint` | Run ESLint and reject warnings. |
+| `pnpm run format` | Format source and configuration files. |
+| `pnpm run format:check` | Check formatting without writing files. |
+| `pnpm test` | Run Vitest; an empty suite is allowed during scaffolding. |
+| `pnpm run test:watch` | Run Vitest in watch mode. |
+| `pnpm run check` | Run frontend types, lint, formatting, and tests. |
+| `pnpm run rust:check` | Check the native Rust project. |
+| `pnpm run rust:fmt` | Check Rust formatting. |
+| `pnpm run rust:lint` | Run Clippy with warnings treated as errors. |
+| `pnpm run rust:test` | Run Rust tests. |
 
 Documentation is excluded from automatic formatting to preserve the existing specifications. Rust formatting is managed by rustfmt.
 
 ## Builds
 
-- `npm run build`: TypeScript validation and production frontend assets in `dist/`.
-- `npm run tauri build`: native application and local bundles under `src-tauri/target/release/`.
-- `npm run tauri build -- --no-bundle --target <target>`: compile a specific native target without creating installers.
+- `pnpm run build`: TypeScript validation and production frontend assets in `dist/`.
+- `pnpm run tauri build`: native application and local bundles under `src-tauri/target/release/`.
+- `pnpm run tauri build --no-bundle --target <target>`: compile a specific native target without creating installers.
 
 Cross-compilation requires the appropriate Rust target and platform toolchain; adding a Rust target alone does not supply all native dependencies.
 
@@ -94,11 +99,11 @@ Cross-compilation requires the appropriate Rust target and platform toolchain; a
 
 The CI workflow runs on pushes, pull requests, and manual dispatch. It installs dependencies, checks frontend quality, runs Rust checks, and compiles the desktop targets. It does not publish releases, sign installers, or validate every target OS version.
 
-Use a clean checkout with `npm ci` and the committed Cargo lockfile for repeatable dependency installation. A fully reproducible release process also requires pinning and validating native build environments and signing procedures.
+Use a clean checkout with `pnpm install --frozen-lockfile` and the committed Cargo lockfile for repeatable dependency installation. A fully reproducible release process also requires pinning and validating native build environments and signing procedures.
 
 ## Windows Application Control
 
-During initial local validation, `cargo fmt` returned Windows Application Control error `4551`. Direct `rustfmt` checks on the Rust source files passed, but this does not establish that the `npm run rust:fmt` command works on this machine. If the error persists, review the blocked executable with the system administrator. The project does not change Windows security policies.
+During initial local validation, `cargo fmt` returned Windows Application Control error `4551`. Direct `rustfmt` checks on the Rust source files passed, but this does not establish that the formatting script works on this machine. If the error persists, review the blocked executable with the system administrator. The project does not change Windows security policies.
 
 ## References
 

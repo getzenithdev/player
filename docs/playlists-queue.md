@@ -54,7 +54,7 @@ Automated tests cover playlist CRUD/reordering/independent duplicates and persis
 
 Recorded validation: **56 Rust tests** and **12 frontend tests** pass; Rust formatting, Clippy with warnings denied, frontend typechecking/lint/format, and the production frontend build pass. A browser smoke test with simulated native responses passed playlist creation/addition/duplication/export, queue append/reorder/save/clear/restore/save-as-playlist, history rendering, and 1100px/640px layouts with no JavaScript runtime errors. Queue screens were visually inspected. These are automated and simulated-runtime checks, not installed-platform acceptance.
 
-Run `npm run check`, `npm run build`, `npm run rust:fmt`, `npm run rust:test`, and `npm run rust:lint`. Native tests do not require an audio device. Browser smoke tests with simulated IPC check UI integration but do not establish native dialog or physical playback compatibility.
+Run `pnpm run check`, `pnpm run build`, `pnpm run rust:fmt`, `pnpm run rust:test`, and `pnpm run rust:lint`. Native tests do not require an audio device. Browser smoke tests with simulated IPC check UI integration but do not establish native dialog or physical playback compatibility.
 
 Installed-build acceptance remains pending on macOS Intel/Apple Silicon, Windows x64, and Linux x64:
 

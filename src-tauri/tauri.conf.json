@@ -4,9 +4,9 @@
   "version": "0.1.0",
   "identifier": "com.zenithplayer.desktop",
   "build": {
-    "beforeDevCommand": "npm run youtube:prepare && npm run dev",
+    "beforeDevCommand": "pnpm run youtube:prepare && pnpm run dev",
     "devUrl": "http://localhost:1420",
-    "beforeBuildCommand": "npm run youtube:prepare && npm run build",
+    "beforeBuildCommand": "pnpm run youtube:prepare && pnpm run build",
     "frontendDist": "../dist"
   },
   "app": {

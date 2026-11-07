@@ -49,11 +49,11 @@ Recorded validation for this implementation:
 Run:
 
 ```sh
-npm run check
-npm run build
-npm run rust:fmt
-npm run rust:lint
-npm run rust:test
+pnpm run check
+pnpm run build
+pnpm run rust:fmt
+pnpm run rust:lint
+pnpm run rust:test
 ```
 
 Before calling the phase platform-accepted, run these manual checks on installed macOS Intel/Apple Silicon, Windows x64, and Linux x64 builds:

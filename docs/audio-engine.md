@@ -70,7 +70,7 @@ Opus needs a separate decoder decision before it can be listed as supported. M4A
 
 ## Manual Verification
 
-1. Run `npm run tauri dev` and open files from **Cola → Abrir archivos**.
+1. Run `pnpm run tauri dev` and open files from **Cola → Abrir archivos**.
 2. Play, pause, resume, stop, change tracks, seek, and adjust volume and mute.
 3. Check repeat off/all/one and shuffle with a queue of at least three tracks.
 4. Play short and long files at different sample rates and bit depths, including high-resolution audio, files with ID3 tags, embedded artwork, and damaged metadata.

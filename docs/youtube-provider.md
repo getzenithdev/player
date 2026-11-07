@@ -44,13 +44,13 @@ disabled the action remains disabled; local search is still selectable.
 
 ### Packaged components and updates
 
-`npm run youtube:prepare` downloads the exact versions and SHA-256 digests in
+`pnpm run youtube:prepare` downloads the exact versions and SHA-256 digests in
 `scripts/youtube-tools.json`. It extracts only the Node executable and license,
 then prepares `src-tauri/tools/`. Both Tauri development and desktop builds run
 this preparation automatically. Tauri ships the folder as resources and Rust
 resolves it using the application's resource directory, including macOS Finder
 launches with a restricted PATH. End users do not install Node or Python.
-The frontend-only `npm run build` remains independent of the helper download.
+The frontend-only `pnpm run build` remains independent of the helper download.
 
 The initial preparation needs Internet access. Later preparations reuse the
 verified components. Generated binaries are ignored by Git. To update, review

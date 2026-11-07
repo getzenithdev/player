@@ -39,7 +39,7 @@ fn command(tools: &Path) -> Result<Command, String> {
     let downloader = tools.join(format!("yt-dlp{suffix}"));
     let runtime = tools.join(format!("node{suffix}"));
     if !downloader.is_file() || !runtime.is_file() {
-        return Err("Faltan los componentes de YouTube. En desarrollo ejecuta npm run youtube:prepare y reinicia la app; si está instalada, reinstala una versión completa. Puedes usar YouTube API para buscar metadatos.".into());
+        return Err("Faltan los componentes de YouTube. En desarrollo ejecuta pnpm run youtube:prepare y reinicia la app; si está instalada, reinstala una versión completa. Puedes usar YouTube API para buscar metadatos.".into());
     }
     let mut command = Command::new(downloader);
     command.args([

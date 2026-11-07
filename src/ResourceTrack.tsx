@@ -7,31 +7,33 @@ export function useResourceTrack(audio: AudioController) {
   const [tracks, setTracks] = useState<LibraryTrack[]>([]);
   const [chosen, setChosen] = useState("");
   const [error, setError] = useState("");
+  const current = audio.state.track;
   useEffect(() => {
     let disposed = false;
     const reload = () =>
       void libraryAction({ kind: "snapshot" })
         .then((s) => {
-          if (!disposed) setTracks(s.tracks);
+          if (!disposed) {
+            setTracks(s.tracks);
+            setError("");
+          }
         })
         .catch((e) => {
           if (!disposed) setError(String(e));
         });
-    reload();
     const cleanup = isTauri()
       ? listen("library:changed", reload)
       : Promise.resolve(() => {});
+    void cleanup.then(() => { if (!disposed) reload(); });
     return () => {
       disposed = true;
       void cleanup.then((f) => f());
     };
-  }, []);
-  const current = audio.state.track;
+  }, [current?.trackId, current?.path]);
   const track =
     tracks.find((t) => t.id === chosen) ??
-    tracks.find(
-      (t) => t.id === current?.trackId || t.local_path === current?.path,
-    );
+    tracks.find((t) => !!current?.trackId && t.id === current.trackId) ??
+    tracks.find((t) => !!current?.path && t.local_path === current.path);
   return {
     tracks,
     track,

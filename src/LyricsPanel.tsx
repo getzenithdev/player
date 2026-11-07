@@ -5,6 +5,8 @@ import {
   activeLine,
   activeWord,
   defaultLyrics,
+  discoverLyrics,
+  displayedLyrics,
   lyricsAction,
   type LyricsPreferences,
   type LyricsSnapshot,
@@ -54,6 +56,7 @@ export function Lyrics({
   const active = useRef<HTMLParagraphElement>(null);
   const generation = useRef(0);
   const trackId = track?.id;
+  const trackMetadata = JSON.stringify([track?.title, track?.artist, track?.album, track?.duration]);
   useEffect(() => {
     setFollowing(true);
   }, [trackId]);
@@ -62,13 +65,26 @@ export function Lyrics({
     const token = ++requests.current;
     if (trackId)
       void lyricsAction(trackId, { kind: "snapshot" })
-        .then((s) => {
+        .then(async (s) => {
           if (token === generation.current) {
             setSnapshot(s);
             setLoadedTrackId(trackId);
             setEditor(null);
             setError("");
             setBusy(false);
+            if (!displayedLyrics(s) && !s.saved.suppress_local && s.preferences.external) {
+              setBusy(true);
+              try {
+                const discovered = await discoverLyrics(trackId, trackMetadata);
+                if (token === generation.current) {
+                  setSnapshot({ ...s, ...discovered });
+                }
+              } catch (reason) {
+                if (token === generation.current) setError(String(reason));
+              } finally {
+                if (token === generation.current) setBusy(false);
+              }
+            }
           }
         })
         .catch((e) => {
@@ -77,7 +93,7 @@ export function Lyrics({
     return () => {
       ++requests.current;
     };
-  }, [trackId]);
+  }, [trackId, trackMetadata]);
   useEffect(() => {
     const change = () =>
       setFullscreen(document.fullscreenElement === section.current);
@@ -87,12 +103,7 @@ export function Lyrics({
   const candidate =
     loadedTrackId !== trackId
       ? null
-      : (snapshot.saved.selected ??
-        (!snapshot.saved.suppress_local
-          ? snapshot.candidates.find(
-              (c) => c.provider === "local" || c.provider === "embedded",
-            )
-          : null));
+      : displayedLyrics(snapshot);
   const preferences = snapshot.preferences;
   const isPlayingTrack = !!track &&
     (audio.state.track?.trackId === track.id ||
@@ -162,7 +173,7 @@ export function Lyrics({
       audio.reportError(reason);
     }
   }
-  async function run(action: object) {
+  async function run(action: { kind: string; [key: string]: unknown }) {
     if (!trackId) return;
     const token = ++generation.current;
     setBusy(true);
@@ -171,9 +182,13 @@ export function Lyrics({
     try {
       const s = await lyricsAction(trackId, action);
       if (token === generation.current) {
+        if (action.kind === "preferences") {
+          s.candidates = snapshot.candidates;
+        }
         setSnapshot(s);
         setLoadedTrackId(trackId);
         setNotice("Listo");
+        return s;
       }
     } catch (e) {
       if (token === generation.current) setError(String(e));
@@ -185,10 +200,15 @@ export function Lyrics({
     patch: Partial<LyricsPreferences>,
     trackOffset = snapshot.saved.offset,
   ) {
+    const token = generation.current + 1;
     void run({
       kind: "preferences",
       preferences: { ...preferences, ...patch },
       offset: trackOffset,
+    }).then((saved) => {
+      if (token === generation.current && patch.external === true && saved?.preferences.external) {
+        void run({ kind: "search", query: null });
+      }
     });
   }
   async function importFile(plus = false) {
@@ -274,7 +294,10 @@ export function Lyrics({
         ))
       ) : (
         <div className="resource-empty">
-          Sin letras guardadas.
+          {busy ? "Buscando letras…" : "Sin letras disponibles."}
+          {!busy && !preferences.external && (
+            <p>Activa LRCLIB en las opciones de letras para buscar en línea.</p>
+          )}
           {immersive && onManage && (
             <button className="button" onClick={onManage}>
               Buscar letras
@@ -316,6 +339,9 @@ export function Lyrics({
         )}
         {track && syncButton}
         {(error || trackError) && <p role="alert">{error || trackError}</p>}
+        {loadedTrackId === trackId && snapshot.warnings.map((warning, index) => (
+          <p key={index} role="status">{warning}</p>
+        ))}
       </section>
     );
   return (

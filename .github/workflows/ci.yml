@@ -17,13 +17,17 @@ jobs:
     runs-on: ubuntu-24.04
     steps:
       - uses: actions/checkout@v7
+      - uses: pnpm/action-setup@v6
+        with:
+          run_install: false
       - uses: actions/setup-node@v6
         with:
           node-version-file: .nvmrc
-          cache: npm
-      - run: npm ci
-      - run: npm run check
-      - run: npm run build
+          cache: pnpm
+          cache-dependency-path: pnpm-lock.yaml
+      - run: pnpm install --frozen-lockfile
+      - run: pnpm run check
+      - run: pnpm run build
 
   desktop:
     needs: frontend
@@ -44,10 +48,14 @@ jobs:
       MACOSX_DEPLOYMENT_TARGET: "12.0"
     steps:
       - uses: actions/checkout@v7
+      - uses: pnpm/action-setup@v6
+        with:
+          run_install: false
       - uses: actions/setup-node@v6
         with:
           node-version-file: .nvmrc
-          cache: npm
+          cache: pnpm
+          cache-dependency-path: pnpm-lock.yaml
       - name: Install Linux dependencies
         if: runner.os == 'Linux'
         run: |
@@ -61,9 +69,9 @@ jobs:
       - uses: Swatinem/rust-cache@v2
         with:
           workspaces: src-tauri -> target
-      - run: npm ci
+      - run: pnpm install --frozen-lockfile
       - name: Prepare and verify packaged YouTube helpers
-        run: npm run youtube:prepare
+        run: pnpm run youtube:prepare
       - name: Smoke-test packaged helper executables
         shell: bash
         run: |
@@ -71,11 +79,11 @@ jobs:
           if [ "$RUNNER_OS" = "Windows" ]; then suffix=".exe"; fi
           "./src-tauri/tools/yt-dlp$suffix" --ignore-config --no-plugin-dirs --version
           "./src-tauri/tools/node$suffix" --version
-      - run: npm run rust:fmt
-      - run: npm run rust:lint
-      - run: npm run rust:test
+      - run: pnpm run rust:fmt
+      - run: pnpm run rust:lint
+      - run: pnpm run rust:test
       - name: Compile desktop application without publishing
-        run: npm run tauri build -- --no-bundle --target ${{ matrix.target }}
+        run: pnpm run tauri build --no-bundle --target ${{ matrix.target }}
       - name: Verify Monterey deployment metadata (app and helpers)
         if: runner.os == 'macOS'
         shell: bash

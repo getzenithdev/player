@@ -56,17 +56,31 @@ The Rust layer (`src-tauri/src/storage/`) carries 25 unit tests covering layout,
 
 ## Development
 
-Install Node.js 22 (22.12+; use this version on Monterey) or Node.js 24 on newer systems, and the [native prerequisites](docs/environment.md) for your operating system, then run:
+Install Node.js 22 (22.12+; use this version on Monterey) or Node.js 24 on newer systems, and the [native prerequisites](docs/environment.md) for your operating system, then install the pinned pnpm version and project dependencies:
 
 ```sh
-npm ci
-npm run tauri dev
+npm install --global pnpm@10.33.4
+pnpm install --frozen-lockfile
 ```
+
+The npm command above only bootstraps pnpm. All project commands use pnpm 10.33.4, pinned in `package.json`; `pnpm-lock.yaml` is the JavaScript lockfile. If pnpm is already installed through Corepack or another version manager, select that same version instead. When switching an existing npm checkout, stop development processes and remove the old `node_modules` directory before installing with pnpm.
+
+### Run on Windows, macOS, and Linux / Ejecutar por sistema
+
+Después de la preparación inicial, abre una terminal en la raíz del proyecto y ejecuta el mismo comando en todos los sistemas:
+
+| Sistema | Terminal | Comando para ejecutar la aplicación |
+| --- | --- | --- |
+| Windows 10 / 11 | PowerShell o CMD | `pnpm run tauri dev` |
+| macOS Monterey 12 y posteriores (Intel / Apple Silicon) | Terminal | `pnpm run tauri dev` |
+| Linux | Bash, Zsh u otra terminal | `pnpm run tauri dev` |
+
+En Monterey usa Node.js 22.12 o posterior de la rama 22. Los requisitos nativos de Rust y Tauri deben estar instalados según tu sistema; consulta [Environment and commands](docs/environment.md). La primera ejecución descarga los componentes de YouTube y necesita conexión a Internet.
 
 For a browser-only frontend preview:
 
 ```sh
-npm run dev
+pnpm run dev
 ```
 
 The browser preview does not provide Tauri's native APIs.
@@ -74,15 +88,15 @@ The browser preview does not provide Tauri's native APIs.
 ## Checks and Builds
 
 ```sh
-npm run check
-npm run build
-npm run rust:fmt
-npm run rust:lint
-npm run rust:test
-npm run tauri build
+pnpm run check
+pnpm run build
+pnpm run rust:fmt
+pnpm run rust:lint
+pnpm run rust:test
+pnpm run tauri build
 ```
 
-`npm run build` compiles the frontend only. `npm run tauri build` builds the desktop application and local bundles. Signing and public releases are not configured yet.
+`pnpm run build` compiles the frontend only. `pnpm run tauri build` builds the desktop application and local bundles. Signing and public releases are not configured yet.
 
 Vitest runs frontend unit tests for storage browser fallbacks, size formatting, library search, grouping, views, playlist references, and stable queue reorder commands. The `--passWithNoTests` flag remains explicit; an empty run is not evidence of feature coverage.
 
