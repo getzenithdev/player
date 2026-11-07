@@ -16,6 +16,7 @@ use std::{
 };
 const DOCUMENT: &str = "library/artwork.json";
 const MAX_IMAGE: usize = 15 * 1024 * 1024;
+mod apple;
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct Asset {
     pub id: String,
@@ -30,6 +31,8 @@ pub struct Asset {
     pub width: u32,
     pub height: u32,
     pub animated: bool,
+    #[serde(default)]
+    pub motion_url: Option<String>,
     pub score: u32,
 }
 #[derive(Debug, Clone, Deserialize, Serialize)]
@@ -44,9 +47,9 @@ impl Default for Preferences {
     fn default() -> Self {
         Self {
             external: false,
-            autoplay: false,
+            autoplay: true,
             looping: true,
-            battery_saver: true,
+            battery_saver: false,
             quality: "preview".into(),
         }
     }
@@ -57,9 +60,12 @@ struct Document {
     tracks: BTreeMap<String, Vec<Asset>>,
     selected: BTreeMap<String, String>,
     preferences: Preferences,
+    apple_checked: BTreeMap<String, (String, u64)>,
+    apple_warnings: BTreeMap<String, Vec<String>>,
 }
 #[derive(Serialize)]
 pub struct Snapshot {
+    pub identity: String,
     pub resolved: Option<Asset>,
     pub candidates: Vec<Asset>,
     pub preferences: Preferences,
@@ -82,6 +88,7 @@ pub struct Manifest {
 #[serde(tag = "kind", rename_all = "camelCase")]
 pub enum Action {
     Snapshot,
+    Discover { #[serde(default)] force: bool },
     Local,
     Import { path: String },
     ImportManifest { path: String },
@@ -255,6 +262,7 @@ fn store(
         width,
         height,
         animated,
+        motion_url: None,
         score,
     })
 }
@@ -285,13 +293,13 @@ pub fn priority(a: &Asset) -> u8 {
 fn configured_priority(
     asset: &Asset,
     providers: &[String],
-) -> (usize, bool, std::cmp::Reverse<u32>) {
+) -> (bool, usize, std::cmp::Reverse<u32>) {
     (
+        !asset.animated,
         providers
             .iter()
             .position(|provider| provider == &asset.provider)
             .unwrap_or(providers.len()),
-        !asset.animated,
         std::cmp::Reverse(asset.score),
     )
 }
@@ -301,13 +309,20 @@ fn resolve(s: &StorageManager, doc: &Document, track: &TrackEntry) -> Option<Ass
     if let Some(id) = doc.selected.get(&track.id)
         && let Some(a) = assets.iter().filter(available).find(|a| &a.id == id)
     {
-        return Some(a.clone());
+        if a.animated { return Some(a.clone()); }
     }
     let providers = crate::settings::load(s)
         .ok()?
         .settings
         .artwork
         .provider_priority;
+    let animated = assets.iter().filter(available).filter(|asset| asset.animated)
+        .min_by_key(|asset| configured_priority(asset, &providers));
+    if let Some(asset) = animated { return Some(asset.clone()); }
+    if let Some(selected) = doc.selected.get(&track.id)
+        && let Some(asset) = assets.iter().filter(available).find(|asset| &asset.id == selected) {
+        return Some(asset.clone());
+    }
     assets
         .iter()
         .filter(available)
@@ -498,6 +513,7 @@ fn archive_search(t: &TrackEntry, query: Option<String>) -> Result<Vec<Asset>, S
                 width: 0,
                 height: 0,
                 animated: false,
+                motion_url: None,
                 score,
             })
         })
@@ -613,6 +629,43 @@ pub fn execute(s: &StorageManager, track_id: String, action: Action) -> Result<S
         Action::Snapshot if load(s)?.tracks.get(&track_id).is_none_or(|a| a.is_empty()) => {
             assets = local(s, &track);
         }
+        Action::Discover { force } => {
+            let fingerprint = apple::identity(&track);
+            let (should_search, existing) = {
+                let _lock = s.library_lock();
+                let doc = load(s)?;
+                let allowed = doc.preferences.external || crate::sources::external_enabled(s);
+                let recent = doc.apple_checked.get(&track_id).is_some_and(|(key, expires)|
+                    key == &fingerprint && *expires > now());
+                let existing = doc.tracks.get(&track_id).and_then(|assets| assets.iter()
+                    .filter(|asset| asset.provider == "apple-music" && image_path(s, &asset.id, "preview").is_ok_and(|path| path.is_file()))
+                    .max_by_key(|asset| (asset.animated, asset.saved_at))).cloned();
+                let recent = recent && (existing.is_some() || doc.apple_warnings.get(&track_id)
+                    .is_some_and(|warnings| !warnings.is_empty()));
+                (allowed && (*force || !recent), existing)
+            };
+            if should_search {
+                let ttl = match apple::search(s, &track, None, existing.as_ref(), *force) {
+                    Ok(Some(found)) => {
+                        let ttl = if found.warning.is_some() { 60 }
+                            else if found.asset.animated { 6 * 3600 } else { 30 * 60 };
+                        if let Some(warning) = found.warning { warnings.push(warning); }
+                        if !found.asset.animated && warnings.is_empty() {
+                            warnings.push("Apple Music no devolvió una portada animada para esta edición del álbum".into());
+                        }
+                        assets.push(found.asset);
+                        ttl
+                    }
+                    Ok(None) => { warnings.push("No se encontró el álbum y artista en Apple Music".into()); 30 * 60 }
+                    Err(error) => { warnings.push(error); 60 }
+                };
+                let _lock = s.library_lock();
+                let mut doc = load(s)?;
+                doc.apple_checked.insert(track_id.clone(), (fingerprint, now() + ttl));
+                doc.apple_warnings.insert(track_id.clone(), warnings.clone());
+                s.save_document(DOCUMENT, &doc).map_err(|e| e.to_string())?;
+            }
+        }
         Action::Import { path } => assets.push(store(
             s,
             &bounded_file(Path::new(path))?,
@@ -641,6 +694,19 @@ pub fn execute(s: &StorageManager, track_id: String, action: Action) -> Result<S
                 Ok(found) => search = Some(found),
                 Err(e) => warnings.push(e),
             }
+            let existing = load(s)?.tracks.get(&track_id).and_then(|assets| assets.iter()
+                .filter(|asset| asset.provider == "apple-music" && image_path(s, &asset.id, "preview").is_ok_and(|path| path.is_file()))
+                .max_by_key(|asset| (asset.animated, asset.saved_at))).cloned();
+            match apple::search(s, &track, query.as_deref(), existing.as_ref(), true) {
+                Ok(Some(found)) => {
+                    if let Some(warning) = found.warning { warnings.push(warning); }
+                    let asset = found.asset;
+                    if let Some(candidates) = &mut search { candidates.push(asset.clone()); }
+                    assets.push(asset);
+                }
+                Ok(None) => {},
+                Err(error) => warnings.push(error),
+            }
         }
         Action::Archive { identifier } => {
             if !load(s)?.preferences.external {
@@ -653,6 +719,10 @@ pub fn execute(s: &StorageManager, track_id: String, action: Action) -> Result<S
     let _lock = s.library_lock();
     let mut doc = load(s)?;
     let mut changed = !assets.is_empty();
+    if matches!(&action, Action::Search { .. }) {
+        doc.apple_warnings.insert(track_id.clone(), warnings.clone());
+        changed = true;
+    }
     for a in assets {
         let entries = doc.tracks.entry(track_id.clone()).or_default();
         if entries.len() >= 100 && !entries.iter().any(|old| old.id == a.id) {
@@ -705,15 +775,64 @@ pub fn execute(s: &StorageManager, track_id: String, action: Action) -> Result<S
         s.save_document(DOCUMENT, &doc).map_err(|e| e.to_string())?;
     }
     let resolved = resolve(s, &doc, &track);
+    if let Some(saved) = doc.apple_warnings.get(&track_id) {
+        for warning in saved {
+            if !warnings.contains(warning) { warnings.push(warning.clone()); }
+        }
+    }
     let mut candidates = search.unwrap_or_else(|| doc.tracks.remove(&track_id).unwrap_or_default());
     let providers = crate::settings::load(s)?.settings.artwork.provider_priority;
     candidates.sort_by_key(|a| configured_priority(a, &providers));
     Ok(Snapshot {
+        identity: apple::identity(&track),
         resolved,
         candidates,
         preferences: doc.preferences,
         warnings,
     })
+}
+
+/// A prepared source already has permission for its catalog and cover request.
+pub(crate) fn source_artwork(s: &StorageManager, track: &TrackEntry, thumbnail: Option<&str>) -> Result<(), String> {
+    let discovered = execute(s, track.id.clone(), Action::Discover { force: false })?;
+    let asset = match discovered.candidates.into_iter().find(|asset| asset.provider == "apple-music") {
+        Some(asset) => asset,
+        _ => {
+            let Some(thumbnail) = thumbnail else { return Ok(()); };
+            let url = reqwest::Url::parse(thumbnail).map_err(|e| e.to_string())?;
+            if url.scheme() != "https" || url.host_str() != Some("i.ytimg.com") {
+                return Ok(());
+            }
+            let source_url = format!("https://www.youtube.com/watch?v={}",
+                url.path().split('/').nth(2).unwrap_or_default());
+            let bytes = resources::get(url, MAX_IMAGE)?;
+            store(s, &bytes, Manifest {
+                version: 1, provider: "youtube".into(), path: String::new(),
+                title: track.title.clone(), artist: track.artist.clone().unwrap_or_default(),
+                album: track.album.clone().unwrap_or_default(), source_url: Some(source_url),
+                license: "YouTube source thumbnail".into(), attribution: "YouTube".into(),
+                permitted_storage: true,
+            }, track)?
+        }
+    };
+    let _lock = s.library_lock();
+    let mut doc = load(s)?;
+    if asset.provider == "apple-music" {
+        let mut library = library::load(s)?;
+        if let Some(saved) = library.tracks.iter_mut().find(|saved| saved.id == track.id) {
+            // Use the catalog spelling after the title and artist have matched.
+            saved.artist = Some(asset.artist.clone());
+            if saved.album.as_ref().is_none_or(|album| album.trim().is_empty()) {
+                saved.album = Some(asset.album.clone());
+            }
+            metadata::prepare(saved)?;
+            library::save(s, &library)?;
+        }
+    }
+    let entries = doc.tracks.entry(track.id.clone()).or_default();
+    entries.retain(|old| old.id != asset.id || old.provider != asset.provider);
+    if entries.len() < 100 { entries.push(asset); }
+    s.save_document(DOCUMENT, &doc).map_err(|e| e.to_string())
 }
 #[tauri::command]
 pub async fn artwork_action(
@@ -828,6 +947,7 @@ mod tests {
             width: 0,
             height: 0,
             animated: true,
+            motion_url: None,
             score: 0,
         };
         assert_eq!(priority(&a), 0);

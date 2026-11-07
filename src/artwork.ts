@@ -12,6 +12,7 @@ export interface ArtworkAsset {
   width: number;
   height: number;
   animated: boolean;
+  motion_url?: string | null;
   score: number;
 }
 export interface ArtworkPreferences {
@@ -22,6 +23,7 @@ export interface ArtworkPreferences {
   quality: "thumbnail" | "preview";
 }
 export interface ArtworkSnapshot {
+  identity?: string;
   resolved: ArtworkAsset | null;
   candidates: ArtworkAsset[];
   preferences: ArtworkPreferences;
@@ -32,9 +34,9 @@ export const emptyArtwork: ArtworkSnapshot = {
   candidates: [],
   preferences: {
     external: false,
-    autoplay: false,
+    autoplay: true,
     looping: true,
-    battery_saver: true,
+    battery_saver: false,
     quality: "preview",
   },
   warnings: [],

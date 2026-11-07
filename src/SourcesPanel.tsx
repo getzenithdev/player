@@ -1,7 +1,7 @@
 import { useCallback, useEffect, useRef, useState } from "react";
 import { isTauri } from "@tauri-apps/api/core";
 import type { AudioController } from "./audio";
-import { entryFromPath } from "./playlists";
+import { SourceArtwork } from "./SourceArtwork";
 import {
   canConnect,
   canDisconnect,
@@ -13,6 +13,7 @@ import {
   formatSize,
   hasCapability,
   sourcesAction,
+  preparedSourceEntry,
   stateHint,
   type ProviderId,
   type ProviderStatus,
@@ -146,8 +147,8 @@ export function Sources({
       id: entry.id,
     });
     if (next?.downloaded)
-      audio.openEntries([
-        { ...entryFromPath(next.downloaded), title: entry.name },
+      await audio.openEntries([
+        await preparedSourceEntry(next.downloaded, entry),
       ]);
   }
 
@@ -466,6 +467,7 @@ export function Sources({
                 entry.provider !== "youtube-auto";
               return (
                 <li key={`${entry.provider}-${entry.id}-${index}`}>
+                  {entry.kind !== "folder" && <SourceArtwork entry={entry} />}
                   <div>
                     <strong>{entry.name}</strong>
                     <p>

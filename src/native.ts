@@ -22,6 +22,7 @@ export interface IntegrationSettings {
 export interface IntegrationSnapshot {
   settings: IntegrationSettings;
   platform: string;
+  lightweightPlayerMotion?: boolean;
   mediaControlsActive: boolean;
   trayActive: boolean;
   shortcutsActive: boolean;

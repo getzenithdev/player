@@ -645,8 +645,7 @@ impl AudioWorker {
     }
 
     fn open_output(&mut self) -> Result<(), String> {
-        let mut sink = DeviceSinkBuilder::open_default_sink()
-            .map_err(|error| format!("No se pudo abrir la salida de audio: {error}"))?;
+        let mut sink = open_device_sink()?;
         sink.log_on_drop(false);
 
         let player = Player::connect_new(sink.mixer());
@@ -1181,6 +1180,48 @@ struct DecodedInfo {
     channels: u16,
 }
 
+fn open_device_sink() -> Result<MixerDeviceSink, String> {
+    // Rodio 0.23 requests a fixed ~50 ms buffer even for the default device.
+    // Let CoreAudio keep its device buffer first: changing it can be rejected
+    // by macOS/drivers. Retain Rodio's device/config fallback if this fails.
+    #[cfg(target_os = "macos")]
+    {
+        let native = DeviceSinkBuilder::from_default_device().and_then(|builder| {
+            builder
+                .with_buffer_size(rodio::cpal::BufferSize::Default)
+                .open_sink_or_fallback()
+        });
+        match native {
+            Ok(sink) => Ok(sink),
+            Err(native_error) => DeviceSinkBuilder::open_default_sink().map_err(|error| {
+                format!(
+                    "No se pudo abrir la salida de audio. Configuración del sistema: {}. Configuración alternativa: {}",
+                    audio_error_details(&native_error),
+                    audio_error_details(&error),
+                )
+            }),
+        }
+    }
+    #[cfg(not(target_os = "macos"))]
+    DeviceSinkBuilder::open_default_sink().map_err(|error| {
+        format!(
+            "No se pudo abrir la salida de audio: {}",
+            audio_error_details(&error)
+        )
+    })
+}
+
+fn audio_error_details(error: &dyn std::error::Error) -> String {
+    let mut details = error.to_string();
+    let mut source = error.source();
+    while let Some(cause) = source {
+        details.push_str(": ");
+        details.push_str(&cause.to_string());
+        source = cause.source();
+    }
+    details
+}
+
 fn decode_file(path: &Path) -> Result<(Decoder<BufReader<File>>, DecodedInfo), String> {
     let file = File::open(path)
         .map_err(|error| format!("No se pudo abrir «{}»: {error}", path.display()))?;
@@ -1426,6 +1467,19 @@ pub fn audio_capabilities() -> AudioCapabilities {
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn output_errors_include_the_os_cause() {
+        let error = rodio::stream::DeviceSinkError::BuildError(rodio::CpalError::with_message(
+            rodio::CpalErrorKind::Other,
+            "CoreAudio OSStatus -10851",
+        ));
+        assert_eq!(
+            audio_error_details(&error),
+            "Error opening the stream with the OS: CoreAudio OSStatus -10851"
+        );
+        assert!(!audio_error_details(&rodio::stream::DeviceSinkError::NoDevice).is_empty());
+    }
 
     #[test]
     fn labels_known_formats() {

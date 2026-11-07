@@ -164,9 +164,9 @@ impl Default for ArtworkSettings {
                 .iter()
                 .map(|value| (*value).into())
                 .collect(),
-            animate: false,
+            animate: true,
             loop_animation: true,
-            battery_saver: true,
+            battery_saver: false,
             quality: "preview".into(),
             allow_downloads: false,
         }

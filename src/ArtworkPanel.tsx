@@ -97,7 +97,7 @@ export function Artwork({ audio }: { audio: AudioController }) {
               trackId={track.id}
               fallbackId={track.artwork_id}
               animate
-              paused={paused}
+              paused={paused || audio.state.status !== "playing"}
             />
             <div>
               <h2>{track.title}</h2>
@@ -151,32 +151,13 @@ export function Artwork({ audio }: { audio: AudioController }) {
                 checked={p.external}
                 onChange={(e) => settings({ external: e.target.checked })}
               />
-              Permitir consultas a Archive.org
+              Permitir consultas a Apple Music y Archive.org
             </label>
-            <label>
-              <input
-                type="checkbox"
-                checked={p.autoplay}
-                onChange={(e) => settings({ autoplay: e.target.checked })}
-              />
-              Reproducción automática
-            </label>
-            <label>
-              <input
-                type="checkbox"
-                checked={p.looping}
-                onChange={(e) => settings({ looping: e.target.checked })}
-              />
-              Repetir animación
-            </label>
-            <label>
-              <input
-                type="checkbox"
-                checked={p.battery_saver}
-                onChange={(e) => settings({ battery_saver: e.target.checked })}
-              />
-              Ahorro de batería (imagen estática)
-            </label>
+            <p className="inline-note">
+              La portada animada tiene prioridad y se reproduce en bucle mientras
+              suena la música y la app está visible. Al pausar o salir de la app
+              se muestra la imagen estática.
+            </p>
             <label>
               Calidad
               <select
@@ -221,6 +202,10 @@ export function Artwork({ audio }: { audio: AudioController }) {
             >
               Buscar portada
             </button>
+            <button className="button" disabled={busy}
+              onClick={() => void run({ kind: "discover", force: true })}>
+              Volver a buscar animación
+            </button>
             <button
               className="button"
               disabled={busy || !snapshot.resolved}
@@ -257,12 +242,13 @@ export function Artwork({ audio }: { audio: AudioController }) {
           <details className="advanced-details">
             <summary>Fuentes y formatos</summary>
             <p className="inline-note">
-              Apple Music y YouTube aceptan recursos obtenidos con autorización
-              mediante un manifiesto local. La consulta directa requiere
-              conectar sus APIs. Archive.org permite revisar candidatos y
-              descargar imágenes con licencia Creative Commons reconocida. La
-              animación admite GIF hasta 120 cuadros y se detiene fuera de
-              vista, al ocultar la ventana y con movimiento reducido.
+              Apple Music busca la portada por título y artista y utiliza el
+              video de portada cuando está disponible. Si el formato de video
+              no es compatible, se muestra la imagen estática. También puedes
+              importar recursos mediante un manifiesto local. Archive.org
+              permite revisar imágenes con licencia Creative Commons reconocida.
+              Las animaciones se detienen fuera de vista, al ocultar la ventana
+              y con movimiento reducido. Los GIF admiten hasta 120 cuadros.
             </p>
           </details>
           {!!snapshot.candidates.length && (

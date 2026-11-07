@@ -33,6 +33,7 @@ React interface
 
 - `AudioEngine` keeps a command sender and an `Arc<Mutex<PlaybackSnapshot>>`.
 - The worker opens the default output device at startup. If that fails, the application still starts and the snapshot reports an error.
+- On macOS, output first uses the system-managed buffer size on the default device, including supported-format fallbacks. This avoids Rodio 0.23's fixed ~50 ms buffer request, which CoreAudio/drivers may reject. If this fails, the engine also tries Rodio's usual device fallback. Errors include the underlying OS cause for both attempts.
 - Every track is decoded through Rodio with byte length and seek support. The decoder exposes duration, sample rate, and channel count before playback.
 - When processing is enabled, the decoded source is wrapped by `ProcessingSource`, which applies the ten-band curve, static gain, balance, edge fades, and limiter on the audio worker thread. Settings changes only replace coefficients; the player is not stopped or reloaded.
 - The worker polls the player position every 200 ms, detects the end of a track, applies repeat/shuffle, and emits position events while playing.

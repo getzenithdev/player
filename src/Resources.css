@@ -75,12 +75,47 @@
   font-weight: 650;
   line-height: 1.5;
 }
+.source-result-cover {
+  width: 56px;
+  height: 56px;
+  border-radius: 10px;
+  flex-shrink: 0;
+  object-fit: cover;
+}
 .lyric-lines p {
   margin: 0 0 28px;
   transition: color 0.18s;
 }
 .lyric-lines .active {
   color: var(--lyric-active);
+}
+.lyric-line-button {
+  display: block;
+  width: 100%;
+  border: 0;
+  border-radius: 6px;
+  padding: 0;
+  background: transparent;
+  color: inherit;
+  font: inherit;
+  letter-spacing: inherit;
+  line-height: inherit;
+  text-align: inherit;
+  cursor: pointer;
+}
+.lyric-line-button:disabled {
+  opacity: 1;
+  cursor: default;
+}
+.lyric-line-button:focus-visible {
+  outline: 2px solid currentColor;
+  outline-offset: 5px;
+}
+.lyrics-sync-controls {
+  display: flex;
+  justify-content: center;
+  flex-shrink: 0;
+  padding: 12px 0;
 }
 .mode-karaoke .lyric-lines .active {
   color: var(--lyric-color);

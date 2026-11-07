@@ -199,14 +199,20 @@ fn parse_results(raw: &[u8]) -> Result<Vec<Entry>, String> {
             .as_str()
             .or_else(|| item["uploader"].as_str())
             .unwrap_or_default();
+        let artist = item["artist"].as_str().filter(|v| !v.trim().is_empty())
+            .map(str::to_string).unwrap_or_else(|| super::youtube_artist(channel));
+        let (name, inferred_artist) = super::youtube_song(title, channel);
         entries.push(Entry {
             provider: ProviderId::YoutubeAuto,
             id: id.into(),
-            name: super::youtube_title(title).chars().take(512).collect(),
+            name: item["track"].as_str().unwrap_or(&name).chars().take(512).collect(),
             kind: "audio".into(),
             detail: channel.chars().take(256).collect(),
             size: None,
             source_url: Some(format!("https://www.youtube.com/watch?v={id}")),
+            artist: if item["artist"].as_str().is_some() { Some(artist) } else { inferred_artist },
+            album: item["album"].as_str().map(str::to_string),
+            thumbnail: Some(format!("https://i.ytimg.com/vi/{id}/hqdefault.jpg")),
         });
     }
     Ok(entries)

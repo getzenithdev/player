@@ -1,4 +1,6 @@
 import { invoke } from "@tauri-apps/api/core";
+import { libraryAction } from "./library";
+import { entryFromPath, entryFromTrack } from "./playlists";
 
 export type ProviderId =
   | "local"
@@ -44,6 +46,9 @@ export interface SourceEntry {
   detail: string;
   size: number | null;
   source_url: string | null;
+  artist?: string | null;
+  album?: string | null;
+  thumbnail?: string | null;
 }
 
 export interface SourcesSnapshot {
@@ -66,6 +71,15 @@ export const emptySources: SourcesSnapshot = {
 
 export const sourcesAction = (action: object): Promise<SourcesSnapshot> =>
   invoke("sources_action", { action });
+
+export async function preparedSourceEntry(path: string, source: SourceEntry) {
+  const library = await libraryAction({ kind: "snapshot" });
+  const track = library.tracks.find((track) => track.local_path === path);
+  return track ? entryFromTrack(track) : {
+    ...entryFromPath(path), title: source.name,
+    artist: source.artist ?? null, album: source.album ?? null,
+  };
+}
 
 /** Prefer the configured API for YouTube search, avoiding duplicate catalogs. */
 export function searchableExternalProviders(snapshot: SourcesSnapshot) {

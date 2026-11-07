@@ -101,6 +101,7 @@ export type LibraryAction =
   | { kind: "import"; paths: string[] }
   | { kind: "removeLocation"; path: string }
   | { kind: "favorite"; id: string; favorite: boolean }
+  | { kind: "favoriteLocal"; path: string }
   | { kind: "edit"; id: string; metadata: MetadataEdit; write_tags: boolean };
 export const emptyLibrary: LibrarySnapshot = {
   tracks: [],

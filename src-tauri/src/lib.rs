@@ -16,7 +16,7 @@ mod settings;
 mod sources;
 mod storage;
 
-use tauri::Manager;
+use tauri::{Emitter, Manager};
 
 #[cfg_attr(mobile, tauri::mobile_entry_point)]
 pub fn run() {
@@ -58,11 +58,17 @@ pub fn run() {
         })
         .on_menu_event(|app, event| native::on_menu_event(app, event.id().as_ref()))
         .on_window_event(|window, event| {
+            if let tauri::WindowEvent::Focused(focused) = event {
+                let visible = *focused && window.is_visible().unwrap_or(false)
+                    && !window.is_minimized().unwrap_or(false);
+                let _ = window.emit("artwork:visibility", visible);
+            }
             if let tauri::WindowEvent::CloseRequested { api, .. } = event {
                 // Closing to the tray keeps playback alive; the application
                 // only exits through the tray or menu quit action.
                 if native::should_hide_on_close(window) {
                     api.prevent_close();
+                    let _ = window.emit("artwork:visibility", false);
                     let _ = window.hide();
                     return;
                 }

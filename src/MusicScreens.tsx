@@ -10,11 +10,13 @@ import {
   playableTracks,
   searchMusic,
 } from "./musicViews";
-import { entryFromPath, entryFromTrack, usePlaylists } from "./playlists";
+import { entryFromTrack, usePlaylists } from "./playlists";
+import { SourceArtwork } from "./SourceArtwork";
 import type { AppView } from "./navigation";
 import {
   searchExternalSources,
   sourcesAction,
+  preparedSourceEntry,
   type SourceEntry,
 } from "./sources";
 
@@ -469,13 +471,13 @@ export function Downloads({
           <button
             className="discovery-song"
             key={entry.id}
-            onClick={() =>
-              void audio.openEntries([
-                { ...entryFromPath(entry.id), title: entry.name },
-              ])
-            }
+            onClick={() => {
+              void preparedSourceEntry(entry.id, entry)
+                .then((track) => audio.openEntries([track]))
+                .catch((reason) => audio.reportError(reason));
+            }}
           >
-            <Icon name="music" />
+            <SourceArtwork entry={entry} />
             <span className="song-info">
               <strong>{entry.name}</strong>
               <span>Guardada en este equipo</span>

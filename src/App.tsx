@@ -242,13 +242,18 @@ export default function App() {
     }
   }
   async function favorite() {
-    if (!current) return;
+    const playing = audio.state.track;
+    if (!playing) return;
     try {
-      await libraryAction({
-        kind: "favorite",
-        id: current.id,
-        favorite: !current.favorite,
-      });
+      if (current) {
+        await libraryAction({
+          kind: "favorite",
+          id: current.id,
+          favorite: !current.favorite,
+        });
+      } else {
+        await libraryAction({ kind: "favoriteLocal", path: playing.path });
+      }
       await reload();
     } catch (reason) {
       audio.reportError(reason);
@@ -461,6 +466,7 @@ export default function App() {
       {playerExpanded && (
         <ExpandedPlayer
           audio={audio}
+          lightweightMotion={integrationSnapshot?.lightweightPlayerMotion ?? false}
           current={current}
           navigate={navigate}
           onOpenFiles={() => void openFiles()}

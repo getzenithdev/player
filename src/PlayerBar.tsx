@@ -68,6 +68,7 @@ export function PlayerBar({
               className="mini-artwork"
               trackId={track?.trackId}
               path={track?.path}
+              fallbackId={current?.artwork_id}
             />
           </button>
         )}
@@ -87,12 +88,12 @@ export function PlayerBar({
           )}
           <span>
             {expanded && current
-              ? (current.artist ?? "Artista desconocido")
+              ? (current.artist ?? track?.artist ?? "Artista desconocido")
               : track
                 ? [
                     track.format,
-                    current?.artist ?? "Archivo de audio",
-                    current?.album,
+                    current?.artist ?? track.artist ?? "Archivo de audio",
+                    current?.album ?? track.album,
                   ]
                     .filter(Boolean)
                     .join(" · ")
@@ -103,7 +104,7 @@ export function PlayerBar({
         </div>
         <button
           className={`icon-button favorite-button ${current?.favorite ? "active" : ""}`}
-          disabled={!current}
+          disabled={!audio.available || !track || current?.missing}
           aria-label={
             current?.favorite ? "Quitar de favoritos" : "Agregar a favoritos"
           }
@@ -190,6 +191,7 @@ export function PlayerBar({
         </div>
       </div>
       <div className="player-tools">
+        <div className="volume-control">
         <button
           className="icon-button"
           disabled={!audio.available}
@@ -199,6 +201,7 @@ export function PlayerBar({
         >
           <Icon name={playback.muted ? "volumeOff" : "volume"} size={18} />
         </button>
+        <div className="volume-slider">
         <input
           type="range"
           aria-label="Volumen"
@@ -212,6 +215,8 @@ export function PlayerBar({
             void audio.setVolume(volume);
           }}
         />
+        </div>
+        </div>
         <button
           className={`icon-button ${playback.shuffle ? "active" : ""}`}
           aria-label="Aleatorio"

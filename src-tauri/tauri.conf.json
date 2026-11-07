@@ -20,8 +20,8 @@
       }
     ],
     "security": {
-      "csp": "default-src 'self'; connect-src 'self' ipc: http://ipc.localhost; img-src 'self' asset: http://asset.localhost data:; style-src 'self' 'unsafe-inline'",
-      "devCsp": "default-src 'self'; script-src 'self' 'unsafe-inline'; connect-src 'self' ipc: http://ipc.localhost http://localhost:1420 ws://localhost:1420; img-src 'self' asset: http://asset.localhost data:; style-src 'self' 'unsafe-inline'"
+      "csp": "default-src 'self'; connect-src 'self' ipc: http://ipc.localhost https://*.mzstatic.com https://*.itunes.apple.com; img-src 'self' asset: http://asset.localhost data: https://i.ytimg.com https://*.mzstatic.com; media-src 'self' data: blob: https://*.mzstatic.com https://*.itunes.apple.com; style-src 'self' 'unsafe-inline'; worker-src 'self' blob:",
+      "devCsp": "default-src 'self'; script-src 'self' 'unsafe-inline'; connect-src 'self' ipc: http://ipc.localhost http://localhost:1420 ws://localhost:1420 https://*.mzstatic.com https://*.itunes.apple.com; img-src 'self' asset: http://asset.localhost data: https://i.ytimg.com https://*.mzstatic.com; media-src 'self' data: blob: https://*.mzstatic.com https://*.itunes.apple.com; style-src 'self' 'unsafe-inline'; worker-src 'self' blob:"
     }
   },
   "plugins": {
@@ -49,6 +49,8 @@
       "icons/icon.icns",
       "icons/icon.ico"
     ],
-    "resources": ["tools/"]
+    "resources": [
+      "tools/"
+    ]
   }
 }

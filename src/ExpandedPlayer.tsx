@@ -25,6 +25,7 @@ export function ExpandedPlayer({
   onOpenFiles,
   onFavorite,
   onMinimize,
+  lightweightMotion = false,
 }: {
   audio: AudioController;
   current?: LibraryTrack;
@@ -32,6 +33,7 @@ export function ExpandedPlayer({
   onOpenFiles: () => void;
   onFavorite: () => void;
   onMinimize: () => void;
+  lightweightMotion?: boolean;
 }) {
   const dialog = useRef<HTMLDialogElement>(null);
   const motion = useRef<ReturnType<typeof animateSpring> | null>(null);
@@ -43,6 +45,10 @@ export function ExpandedPlayer({
     minimize.current = onMinimize;
   }, [onMinimize]);
   useEffect(() => {
+    if (closing.current) {
+      minimize.current();
+      return;
+    }
     const element = dialog.current;
     const opener = document.activeElement;
     if (element && opener instanceof HTMLElement) {
@@ -53,14 +59,48 @@ export function ExpandedPlayer({
     const update = (progress: number) => {
       if (!element) return;
       element.style.opacity = String(progress);
-      element.style.transform = `translateY(${(1 - progress) * 12}px) scale(${0.985 + progress * 0.015})`;
+      element.style.transform = lightweightMotion
+        ? "none"
+        : `translateY(${(1 - progress) * 12}px) scale(${0.985 + progress * 0.015})`;
     };
     update(preference.matches ? 1 : 0);
     element?.showModal();
-    if (!preference.matches)
-      motion.current = animateSpring(update, (value) => {
-        if (value === 0) minimize.current();
-      });
+    if (!preference.matches && element) {
+      if (lightweightMotion) {
+        let animation: Animation | null = null;
+        let deadline: number | undefined;
+        const stop = () => {
+          window.clearTimeout(deadline);
+          if (animation) {
+            animation.onfinish = null;
+            animation.cancel();
+            animation = null;
+          }
+        };
+        const to = (target: number) => {
+          const opacity = getComputedStyle(element).opacity;
+          stop();
+          element.style.opacity = String(target);
+          animation = element.animate([{ opacity }, { opacity: target }], {
+            duration: 150,
+            easing: "cubic-bezier(0.23, 1, 0.32, 1)",
+          });
+          const finish = () => {
+            stop();
+            if (target === 0) minimize.current();
+          };
+          animation.onfinish = finish;
+          // Do not wait for a spring to settle when rendering falls behind.
+          deadline = window.setTimeout(finish, 150);
+        };
+        motion.current = { to, stop };
+        to(1);
+      } else {
+        motion.current = animateSpring(update, (value) => {
+          if (value === 0) minimize.current();
+        });
+      }
+    }
     const reduce = () => {
       if (!preference.matches) return;
       motion.current?.stop();
@@ -77,8 +117,9 @@ export function ExpandedPlayer({
       if (opener instanceof HTMLElement && opener.isConnected)
         opener.focus({ preventScroll: true });
     };
-  }, []);
+  }, [lightweightMotion]);
   function closePlayer() {
+    if (closing.current) return;
     closing.current = true;
     if (motion.current) motion.current.to(0);
     else onMinimize();

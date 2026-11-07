@@ -17,6 +17,7 @@ use serde::{Deserialize, Serialize};
 use sha2::{Digest, Sha256};
 use std::{
     collections::BTreeMap,
+    fs,
     io::{Read as _, Write as _},
     net::TcpListener,
     path::{Path, PathBuf},
@@ -183,6 +184,7 @@ struct Document {
     settings: BTreeMap<ProviderId, ProviderSettings>,
     /// Completed cache files explicitly requested with Download, keyed by filename.
     downloads: BTreeMap<String, String>,
+    cached_results: BTreeMap<String, Entry>,
 }
 
 /// One browsable or searchable item returned by a provider.
@@ -196,6 +198,12 @@ pub struct Entry {
     pub detail: String,
     pub size: Option<u64>,
     pub source_url: Option<String>,
+    #[serde(default)]
+    pub artist: Option<String>,
+    #[serde(default)]
+    pub album: Option<String>,
+    #[serde(default)]
+    pub thumbnail: Option<String>,
 }
 
 /// Static description of a provider: contract, not state.
@@ -1003,6 +1011,9 @@ fn webdav_entries(
         let kind = entry_kind(&name, folder, content_type.as_deref());
         entries.push(Entry {
             provider: ProviderId::Webdav,
+            artist: None,
+            album: None,
+            thumbnail: None,
             id,
             name,
             kind,
@@ -1842,6 +1853,48 @@ fn active(
     }
 }
 
+fn cache_results(storage: &StorageManager, entries: &[Entry]) -> Result<(), String> {
+    let _lock = storage.library_lock();
+    let mut document = load(storage)?;
+    // Keep the latest provider query; signed download URLs are never cached.
+    for entry in entries {
+        let mut entry = entry.clone();
+        if entry.provider == ProviderId::OneDrive { entry.source_url = None; }
+        document.cached_results.insert(format!("{:?}:{}", entry.provider, entry.id), entry);
+    }
+    while document.cached_results.len() > 500 {
+        document.cached_results.pop_first();
+    }
+    save(storage, &document)
+}
+
+fn remember_source_track(
+    storage: &StorageManager, provider: ProviderId, id: &str, path: &str,
+) -> Result<(), String> {
+    if provider == ProviderId::Local { return Ok(()); }
+    let entry = load(storage)?.cached_results.get(&format!("{provider:?}:{id}")).cloned();
+    let Some(entry) = entry else { return Ok(()); };
+    crate::library::execute(storage, crate::library::LibraryAction::Import {
+        paths: vec![path.to_string()],
+    })?;
+    let canonical = fs::canonicalize(path).map_err(|e| e.to_string())?;
+    {
+        let _lock = storage.library_lock();
+        let mut doc = crate::library::load(storage)?;
+        let Some(track) = doc.tracks.iter_mut().find(|track| track.local_path.as_ref()
+            .is_some_and(|p| Path::new(p) == canonical)) else { return Ok(()); };
+        track.title = entry.name.clone();
+        if let Some(artist) = entry.artist.as_ref().filter(|v| !v.trim().is_empty()) {
+            track.artist = Some(artist.clone());
+        }
+        if entry.album.is_some() { track.album = entry.album.clone(); }
+        track.edited = true;
+        crate::metadata::prepare(track)?;
+        crate::library::save(storage, &doc)?;
+    }
+    Ok(())
+}
+
 // --- adapters ----------------------------------------------------------------
 
 fn local_search(storage: &StorageManager, query: &str) -> Vec<Entry> {
@@ -1850,6 +1903,9 @@ fn local_search(storage: &StorageManager, query: &str) -> Vec<Entry> {
         .into_iter()
         .map(|hit: TrackHit| Entry {
             provider: ProviderId::Local,
+            artist: hit.artist.clone(),
+            album: hit.album.clone(),
+            thumbnail: None,
             id: hit.id,
             name: hit.title,
             kind: "audio".into(),
@@ -1947,6 +2003,9 @@ fn drive_search(
         }
         entries.push(Entry {
             provider: ProviderId::GoogleDrive,
+            artist: None,
+            album: None,
+            thumbnail: None,
             id: id.to_string(),
             name: name.to_string(),
             kind,
@@ -2038,6 +2097,9 @@ fn dropbox_entry(metadata: &serde_json::Value, provider: ProviderId) -> Result<E
     let folder = tag == "folder";
     Ok(Entry {
         provider,
+        artist: None,
+        album: None,
+        thumbnail: None,
         id: path.to_string(),
         name: name.to_string(),
         kind: entry_kind(name, folder, None),
@@ -2132,6 +2194,9 @@ fn onedrive_entries(active: &Active, url: &str) -> Result<Vec<Entry>, String> {
         let folder = item.get("folder").is_some();
         result.push(Entry {
             provider: ProviderId::OneDrive,
+            artist: item.get("audio").and_then(|a| a.get("artist")).and_then(|v| v.as_str()).map(str::to_string),
+            album: item.get("audio").and_then(|a| a.get("album")).and_then(|v| v.as_str()).map(str::to_string),
+            thumbnail: None,
             id: id.to_string(),
             name: name.to_string(),
             kind: entry_kind(name, folder, None),
@@ -2230,6 +2295,7 @@ fn youtube_search(
     url.query_pairs_mut()
         .append_pair("part", "snippet")
         .append_pair("type", "video")
+        .append_pair("videoCategoryId", "10")
         .append_pair("maxResults", "25")
         .append_pair("q", query)
         .append_pair("key", key);
@@ -2270,11 +2336,15 @@ fn youtube_search(
             .and_then(|value| value.as_str())
             .map(decode_entities)
             .unwrap_or_default();
+        let (song, artist) = youtube_song(&title, &channel);
         ids.push(id.to_string());
         entries.push(Entry {
             provider: ProviderId::Youtube,
+            artist,
+            album: None,
+            thumbnail: Some(format!("https://i.ytimg.com/vi/{id}/hqdefault.jpg")),
             id: id.to_string(),
-            name: youtube_title(&title),
+            name: song,
             kind: "video".into(),
             detail: channel,
             size: None,
@@ -2349,6 +2419,24 @@ fn youtube_title(title: &str) -> String {
     } else {
         song.into()
     }
+}
+
+fn youtube_artist(channel: &str) -> String {
+    let channel = channel.trim().trim_end_matches(" - Topic").trim();
+    channel.strip_suffix("VEVO").unwrap_or(channel).trim().to_string()
+}
+
+fn youtube_song(title: &str, channel: &str) -> (String, Option<String>) {
+    let title = youtube_title(title);
+    for separator in [" - ", " – ", " — "] {
+        if let Some((artist, song)) = title.split_once(separator)
+            && !artist.trim().is_empty() && !song.trim().is_empty()
+        {
+            return (song.trim().to_string(), Some(artist.trim().to_string()));
+        }
+    }
+    let artist = youtube_artist(channel);
+    (title, (!artist.is_empty()).then_some(artist))
 }
 
 const AUDIO_EXTENSIONS: &[&str] = &["mp3", "flac", "wav", "ogg", "m4a", "aac", "aiff", "caf"];
@@ -2714,6 +2802,9 @@ fn execute_with(
                     }
                     results.push(Entry {
                         provider: ProviderId::Local,
+                        artist: None,
+                        album: None,
+                        thumbnail: None,
                         id: path.to_string_lossy().to_string(),
                         name: saved.get(&name).cloned().unwrap_or(name),
                         kind: "audio".into(),
@@ -2766,10 +2857,12 @@ fn execute_with(
                 ensure_external(storage)?;
             }
             results = search(storage, store, env, provider, &query)?;
+            cache_results(storage, &results)?;
         }
         Action::Browse { provider, path } => {
             ensure_external(storage)?;
             results = browse(storage, store, env, provider, path)?;
+            cache_results(storage, &results)?;
         }
         Action::Prepare { provider, id } => {
             if provider != ProviderId::Local {
@@ -2781,12 +2874,16 @@ fn execute_with(
                 provider
             };
             downloaded = Some(download(storage, store, env, playback_provider, &id)?);
+            if let Some(path) = &downloaded {
+                remember_source_track(storage, provider, &id, path)?;
+            }
         }
         Action::Download { provider, id, name } => {
             if provider != ProviderId::Local {
                 ensure_external(storage)?;
             }
             let path = download(storage, store, env, provider, &id)?;
+            remember_source_track(storage, provider, &id, &path)?;
             if provider != ProviderId::Local {
                 let filename = Path::new(&path)
                     .file_name()
@@ -2813,9 +2910,13 @@ fn execute_with(
 #[path = "sources_tests.rs"]
 mod tests;
 
+pub(crate) fn external_enabled(storage: &StorageManager) -> bool {
+    load(storage).is_ok_and(|document| document.external)
+}
+
 #[tauri::command]
 pub async fn sources_action(app: tauri::AppHandle, action: Action) -> Result<Snapshot, String> {
-    use tauri::Manager;
+    use tauri::{Emitter, Manager};
     let env = Env {
         youtube_tools: app
             .path()
@@ -2825,7 +2926,33 @@ pub async fn sources_action(app: tauri::AppHandle, action: Action) -> Result<Sna
         ..Env::default()
     };
     tauri::async_runtime::spawn_blocking(move || {
-        execute_with(&app.state::<StorageManager>(), &OsVault, &env, action)
+        let source = match &action {
+            Action::Prepare { provider, id } | Action::Download { provider, id, .. }
+                if *provider != ProviderId::Local => Some((*provider, id.clone())),
+            _ => None,
+        };
+        let result = execute_with(&app.state::<StorageManager>(), &OsVault, &env, action)?;
+        if let (Some((provider, id)), Some(path)) = (source, result.downloaded.as_ref()) {
+            let _ = app.emit("library:changed", ());
+            let storage = app.state::<StorageManager>();
+            let entry = load(&storage)?.cached_results.get(&format!("{provider:?}:{id}")).cloned();
+            let track = {
+                let _lock = storage.library_lock();
+                crate::library::load(&storage)?.tracks.into_iter()
+                    .find(|track| track.local_path.as_ref() == Some(path))
+            };
+            if let Some(track) = track {
+                let app = app.clone();
+                std::thread::spawn(move || {
+                    if crate::artwork::source_artwork(&app.state::<StorageManager>(), &track,
+                        entry.as_ref().and_then(|entry| entry.thumbnail.as_deref())).is_ok() {
+                        let _ = app.emit("artwork:changed", ());
+                        let _ = app.emit("library:changed", ());
+                    }
+                });
+            }
+        }
+        Ok(result)
     })
     .await
     .map_err(|error| error.to_string())?

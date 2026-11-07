@@ -1,10 +1,11 @@
 import { useEffect, useState } from "react";
 import type { AudioController } from "./audio";
-import { entryFromPath } from "./playlists";
+import { SourceArtwork } from "./SourceArtwork";
 import {
   entryActions,
   searchExternalSources,
   sourcesAction,
+  preparedSourceEntry,
   type SourceEntry,
 } from "./sources";
 import "./Resources.css";
@@ -47,7 +48,7 @@ export function ExternalSearchResults({
       });
       if (play && next.downloaded)
         await audio.openEntries([
-          { ...entryFromPath(next.downloaded), title: entry.name },
+          await preparedSourceEntry(next.downloaded, entry),
         ]);
     } catch (reason) {
       setError(String(reason));
@@ -85,6 +86,7 @@ export function ExternalSearchResults({
           const actions = provider && entryActions(provider, entry);
           return (
             <li key={`${entry.provider}:${entry.id}`}>
+              <SourceArtwork entry={entry} />
               <div className="grow">
                 <strong>{entry.name}</strong>
                 <p className="secondary">

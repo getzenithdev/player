@@ -253,12 +253,22 @@
 }
 .expanded-player .player-tools {
   display: grid;
-  grid-template-columns: 30px minmax(0, 1fr) 30px 30px;
+  grid-template-columns: minmax(0, 1fr) 30px 30px;
   gap: 7px;
   align-items: center;
   margin-top: 10px;
   grid-column: auto;
   grid-row: auto;
+}
+.expanded-player .volume-control {
+  display: flex;
+  align-items: center;
+  gap: 7px;
+  min-width: 0;
+}
+.expanded-player .volume-slider {
+  flex: 1;
+  min-width: 0;
 }
 .expanded-player .player-tools input {
   display: block;
@@ -295,6 +305,8 @@
   justify-content: center;
 }
 .lyrics-immersive .lyric-lines {
+  scroll-behavior: auto;
+  overflow-anchor: none;
   flex: 1;
   min-height: 0;
   height: 100%;
@@ -323,6 +335,12 @@
 .lyrics-immersive .lyric-lines p {
   margin: 0 0 34px;
   color: var(--lyric-color);
+}
+.lyrics-immersive .lyric-lines p.past {
+  filter: blur(0.65px);
+}
+.lyrics-immersive .lyric-lines p:focus-within {
+  filter: none;
 }
 .lyrics-immersive .lyric-lines .active {
   color: #fff;

@@ -70,6 +70,9 @@ pub enum LibraryAction {
         id: String,
         favorite: bool,
     },
+    FavoriteLocal {
+        path: String,
+    },
 }
 #[derive(Serialize)]
 pub struct DuplicateGroup {
@@ -234,6 +237,21 @@ pub fn execute(storage: &StorageManager, action: LibraryAction) -> Result<Librar
                 .ok_or("La pista ya no existe")?;
             track.favorite = favorite;
         }
+        LibraryAction::FavoriteLocal { path } => {
+            let path = fs::canonicalize(&path).map_err(|e| e.to_string())?;
+            if !path.is_file() || !supported(&path) {
+                return Err("El archivo de audio ya no está disponible".into());
+            }
+            let text = path.to_string_lossy().into_owned();
+            if !doc.locations.contains(&text) {
+                doc.locations.push(text.clone());
+            }
+            reconcile(storage, &mut doc, &mut warnings);
+            let track = doc.tracks.iter_mut()
+                .find(|t| t.local_path.as_deref() == Some(text.as_str()) && !t.missing)
+                .ok_or("No se pudo agregar el archivo a favoritos")?;
+            track.favorite = true;
+        }
         LibraryAction::Edit {
             id,
             metadata,
@@ -278,6 +296,7 @@ pub fn execute(storage: &StorageManager, action: LibraryAction) -> Result<Librar
             }
         }
     }
+    remove_deleted_favorites(&mut doc);
     crate::metadata::prepare_document(&mut doc)?;
     if doc != before {
         save(storage, &doc)?;
@@ -288,6 +307,25 @@ fn covered(path: &Path, locations: &[String]) -> bool {
     locations
         .iter()
         .any(|root| path == Path::new(root) || path.starts_with(Path::new(root)))
+}
+fn remove_deleted_favorites(doc: &mut TracksDocument) {
+    for track in &mut doc.tracks {
+        if track.favorite && track.source.as_deref() == Some("local") {
+            if let Some(path) = &track.local_path {
+                match fs::metadata(path) {
+                    Ok(meta) if !meta.is_file() => {
+                        track.favorite = false;
+                        track.missing = true;
+                    }
+                    Err(error) if error.kind() == std::io::ErrorKind::NotFound => {
+                        track.favorite = false;
+                        track.missing = true;
+                    }
+                    _ => {}
+                }
+            }
+        }
+    }
 }
 fn supported(path: &Path) -> bool {
     path.extension().and_then(|e| e.to_str()).is_some_and(|e| {
@@ -460,6 +498,7 @@ pub(crate) fn reconcile(
             warnings.push(format!("{}: {e}", path.display()));
         }
     }
+    remove_deleted_favorites(doc);
     warnings.truncate(100);
 }
 fn probe_file(path: &Path) -> Result<lofty::file::TaggedFile, String> {

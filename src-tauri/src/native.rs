@@ -97,6 +97,7 @@ impl IntegrationSettings {
 pub struct IntegrationSnapshot {
     pub settings: IntegrationSettings,
     pub platform: &'static str,
+    pub lightweight_player_motion: bool,
     pub media_controls_active: bool,
     pub tray_active: bool,
     pub shortcuts_active: bool,
@@ -144,6 +145,7 @@ impl NativeState {
         IntegrationSnapshot {
             settings: self.settings(),
             platform: std::env::consts::OS,
+            lightweight_player_motion: lightweight_player_motion(),
             media_controls_active: self.media_active.load(Ordering::Relaxed),
             tray_active: self.tray_active.load(Ordering::Relaxed),
             shortcuts_active: self.shortcuts_active.load(Ordering::Relaxed),
@@ -161,6 +163,40 @@ impl NativeState {
     fn add_notice(&self, notice: impl Into<String>) {
         lock(&self.notices).push(notice.into());
     }
+}
+
+/// Only Monterey on Intel hardware. An x86_64 process under Rosetta is excluded.
+#[cfg(all(target_os = "macos", target_arch = "x86_64"))]
+fn lightweight_player_motion() -> bool {
+    static ENABLED: std::sync::OnceLock<bool> = std::sync::OnceLock::new();
+    *ENABLED.get_or_init(|| {
+        fn read(name: &std::ffi::CStr) -> Option<Vec<u8>> {
+            let mut bytes = vec![0u8; 128];
+            let mut size = bytes.len();
+            // SAFETY: name is NUL-terminated and the writable buffer has size bytes.
+            // Both new-value arguments are null/zero: this only reads the sysctl.
+            let result = unsafe {
+                libc::sysctlbyname(name.as_ptr(), bytes.as_mut_ptr().cast(), &mut size,
+                    std::ptr::null_mut(), 0)
+            };
+            if result != 0 || size > bytes.len() { return None; }
+            bytes.truncate(size);
+            Some(bytes)
+        }
+        fn flag(name: &std::ffi::CStr) -> Option<i32> {
+            Some(i32::from_ne_bytes(read(name)?.try_into().ok()?))
+        }
+        if flag(c"sysctl.proc_translated") == Some(1)
+            || flag(c"hw.optional.arm64") == Some(1) { return false; }
+        let Some(version) = read(c"kern.osproductversion") else { return false; };
+        let Ok(version) = std::str::from_utf8(&version) else { return false; };
+        version.trim_end_matches('\0').split('.').next() == Some("12")
+    })
+}
+
+#[cfg(not(all(target_os = "macos", target_arch = "x86_64")))]
+fn lightweight_player_motion() -> bool {
+    false
 }
 
 /// Loads persisted settings, manages the state and applies every integration.
@@ -315,9 +351,9 @@ fn ensure_media_controls(app: &AppHandle, enabled: bool) -> Result<bool, String>
     Ok(true)
 }
 
-fn platform_config(app: &AppHandle) -> PlatformConfig<'static> {
+fn platform_config(_app: &AppHandle) -> PlatformConfig<'static> {
     #[cfg(target_os = "windows")]
-    let hwnd = app.get_webview_window("main").and_then(|window| {
+    let hwnd = _app.get_webview_window("main").and_then(|window| {
         let handle = window.window_handle().ok()?;
         match handle.as_raw() {
             raw_window_handle::RawWindowHandle::Win32(handle) => {

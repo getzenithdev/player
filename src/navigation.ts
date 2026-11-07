@@ -4,7 +4,6 @@ export const navigation = [
   { view: "library", label: "Canciones", group: "library" },
   { view: "albums", label: "Álbumes", group: "library" },
   { view: "artists", label: "Artistas", group: "library" },
-  { view: "genres", label: "Géneros", group: "library" },
   { view: "favorites", label: "Favoritos", group: "library" },
   { view: "playlists", label: "Mis listas", group: "library" },
   { view: "history", label: "Historial", group: "library" },
@@ -16,6 +15,7 @@ export const navigation = [
 export type AppView =
   | (typeof navigation)[number]["view"]
   | "nowPlaying"
+  | "genres"
   | "queue"
   | "lyrics"
   | "artwork";
@@ -24,6 +24,7 @@ export const viewTitle = (view: AppView) =>
   (
     {
       nowPlaying: "Ahora suena",
+      genres: "Géneros",
       queue: "Cola de reproducción",
       lyrics: "Letras",
       artwork: "Portada de la canción",

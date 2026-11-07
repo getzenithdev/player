@@ -12,6 +12,23 @@ import {
 import { useResourceTrack } from "./ResourceTrack";
 import "./Resources.css";
 import { TrackArtwork } from "./TrackArtwork";
+
+// CSS cubic-bezier(0.77, 0, 0.175, 1), shared by each scroll retarget.
+function lyricScrollEase(progress: number) {
+  if (progress <= 0 || progress >= 1) return progress;
+  let low = 0;
+  let high = 1;
+  for (let i = 0; i < 16; i++) {
+    const t = (low + high) / 2;
+    const x = 3 * (1 - t) ** 2 * t * 0.77 +
+      3 * (1 - t) * t ** 2 * 0.175 + t ** 3;
+    if (x < progress) low = t;
+    else high = t;
+  }
+  const t = (low + high) / 2;
+  return 3 * (1 - t) * t ** 2 + t ** 3;
+}
+
 export function Lyrics({
   audio,
   compact = false,
@@ -31,10 +48,15 @@ export function Lyrics({
   const [busy, setBusy] = useState(false);
   const [editor, setEditor] = useState<string | null>(null);
   const [fullscreen, setFullscreen] = useState(false);
+  const [following, setFollowing] = useState(true);
+  const [syncRequest, setSyncRequest] = useState(0);
   const section = useRef<HTMLElement>(null);
   const active = useRef<HTMLParagraphElement>(null);
   const generation = useRef(0);
   const trackId = track?.id;
+  useEffect(() => {
+    setFollowing(true);
+  }, [trackId]);
   useEffect(() => {
     const requests = generation;
     const token = ++requests.current;
@@ -72,36 +94,74 @@ export function Lyrics({
             )
           : null));
   const preferences = snapshot.preferences;
-  const position =
-    track &&
+  const isPlayingTrack = !!track &&
     (audio.state.track?.trackId === track.id ||
-      audio.state.track?.path === track.local_path)
-      ? audio.state.positionMs
-      : 0;
+      audio.state.track?.path === track.local_path);
+  const position = isPlayingTrack ? audio.state.positionMs : 0;
+  const canSeek = audio.available && isPlayingTrack &&
+    ["playing", "paused"].includes(audio.state.status);
   const offset =
     preferences.offset +
     snapshot.saved.offset +
     (candidate?.parsed.offset ?? 0);
   const line = activeLine(candidate?.parsed.lines ?? [], position, offset);
   useEffect(() => {
+    if (!following) return;
     const node = active.current;
     const pane = node?.parentElement;
     if (node && pane) {
       const rect = node.getBoundingClientRect();
       const parent = pane.getBoundingClientRect();
-      pane.scrollTo({
-        top:
+      const start = pane.scrollTop;
+      const target = Math.max(0, Math.min(pane.scrollHeight - pane.clientHeight,
           pane.scrollTop +
           rect.top -
           parent.top -
           pane.clientHeight / 2 +
-          rect.height / 2,
-        behavior: window.matchMedia("(prefers-reduced-motion: reduce)").matches
-          ? "instant"
-          : "smooth",
-      });
+          rect.height / 2));
+      const preference = window.matchMedia("(prefers-reduced-motion: reduce)");
+      if (preference.matches) {
+        pane.scrollTop = target;
+        return;
+      }
+      // Retarget from the current scroll position when a line changes or a seek interrupts.
+      let frame = 0;
+      const started = performance.now();
+      const step = (now: number) => {
+        const progress = Math.min(1, (now - started) / 280);
+        const eased = lyricScrollEase(progress);
+        pane.scrollTop = start + (target - start) * eased;
+        if (progress < 1) frame = requestAnimationFrame(step);
+      };
+      const reduce = () => {
+        if (preference.matches) {
+          cancelAnimationFrame(frame);
+          pane.scrollTop = target;
+        }
+      };
+      preference.addEventListener("change", reduce);
+      frame = requestAnimationFrame(step);
+      return () => {
+        cancelAnimationFrame(frame);
+        preference.removeEventListener("change", reduce);
+      };
     }
-  }, [line, candidate]);
+  }, [line, candidate, following, syncRequest]);
+  function resync() {
+    setFollowing(true);
+    setSyncRequest((value) => value + 1);
+  }
+  async function seekLine(at: number) {
+    if (!canSeek) return;
+    try {
+      const target = Math.max(0, at - offset);
+      await audio.seek(audio.state.durationMs === null
+        ? target : Math.min(target, audio.state.durationMs));
+      resync();
+    } catch (reason) {
+      audio.reportError(reason);
+    }
+  }
   async function run(action: object) {
     if (!trackId) return;
     const token = ++generation.current;
@@ -175,15 +235,28 @@ export function Lyrics({
       className={`lyric-lines${candidate ? "" : " lyrics-empty"}`}
       aria-label="Letra"
       tabIndex={0}
+      onWheel={() => setFollowing(false)}
+      onTouchMove={() => setFollowing(false)}
+      onKeyDown={(event) => {
+        if (["ArrowUp", "ArrowDown", "PageUp", "PageDown", "Home", "End", " "].includes(event.key)
+          && event.target === event.currentTarget) setFollowing(false);
+      }}
     >
       {candidate ? (
         candidate.parsed.lines.map((l, i) => (
           <p
             key={i}
             ref={i === line ? active : undefined}
-            className={i === line ? "active" : ""}
+            className={i === line ? "active" : i < line ? "past" : ""}
             aria-current={i === line ? "true" : undefined}
           >
+            <button
+              type="button"
+              className="lyric-line-button"
+              disabled={l.at === null || !canSeek}
+              onClick={() => { if (l.at !== null) void seekLine(l.at); }}
+              aria-label={l.at === null ? undefined : `Ir a ${Math.floor(Math.max(0, l.at - offset) / 1000)} segundos: ${l.text || "♪"}`}
+            >
             {preferences.mode === "karaoke" && l.words.length
               ? l.words.map((w, j) => (
                   <span
@@ -196,6 +269,7 @@ export function Lyrics({
                   </span>
                 ))
               : l.text || "♪"}
+            </button>
           </p>
         ))
       ) : (
@@ -208,6 +282,14 @@ export function Lyrics({
           )}
         </div>
       )}
+    </div>
+  );
+  const syncButton = candidate?.parsed.lines.some((l) => l.at !== null) && (
+    <div className="lyrics-sync-controls">
+      <button type="button" className="button lyrics-resync" onClick={resync}
+        aria-pressed={following}>
+        Volver a sincronizar
+      </button>
     </div>
   );
   if (immersive)
@@ -232,6 +314,7 @@ export function Lyrics({
         ) : (
           reading
         )}
+        {track && syncButton}
         {(error || trackError) && <p role="alert">{error || trackError}</p>}
       </section>
     );
@@ -311,6 +394,7 @@ export function Lyrics({
             ))}
           </div>
           {reading}
+          {syncButton}
           {candidate && (
             <p className="secondary">
               {candidate.provider} ·{" "}
