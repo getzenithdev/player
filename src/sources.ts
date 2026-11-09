@@ -63,7 +63,7 @@ export interface SourcesSnapshot {
 export const emptySources: SourcesSnapshot = {
   providers: [],
   results: [],
-  external: false,
+  external: true,
   pending_url: null,
   downloaded: null,
   warnings: [],

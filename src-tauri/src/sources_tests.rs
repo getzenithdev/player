@@ -569,13 +569,17 @@ fn the_document_persists_connections_and_settings_but_never_credentials() {
 }
 
 #[test]
-fn external_sources_stay_off_until_the_user_opts_in() {
+fn external_sources_start_enabled_and_respect_disabling() {
     let _guard = serial();
     let f = Fixture::new();
     let env = plain_env();
     f.seed_library();
 
     let snapshot = f.run(&env, Action::Snapshot).expect("snapshot");
+    assert!(snapshot.external);
+    let snapshot = f
+        .run(&env, Action::External { enabled: false })
+        .expect("disable external sources");
     assert!(!snapshot.external);
 
     let error = f

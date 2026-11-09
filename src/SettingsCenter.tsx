@@ -1,3 +1,4 @@
+import { themes } from "./preferences";
 import {
   useCallback,
   useEffect,
@@ -522,16 +523,18 @@ export function SettingsCenter({
           <>
             <Row
               title="Tema"
-              description="Automático sigue el tema de tu equipo."
+              description="Violeta es el tema predeterminado. Automático sigue el tema de tu equipo."
             >
               <select
                 aria-label="Tema de la interfaz"
                 value={draft.appearance.theme}
                 onChange={(event) => changeTheme(event.target.value)}
               >
-                <option value="dark">Oscuro</option>
-                <option value="light">Claro</option>
-                <option value="system">Automático</option>
+                {themes.map((theme) => (
+                  <option key={theme.value} value={theme.value}>
+                    {theme.label}
+                  </option>
+                ))}
               </select>
             </Row>
             <Row

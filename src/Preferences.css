@@ -36,12 +36,18 @@
   --pref-accent-light: #8a6224;
 }
 
+:root[data-accent="white"] {
+  --pref-accent: #ffffff;
+  --pref-accent-light: #ffffff;
+}
+
 :root[data-accent] .workspace {
   --accent: var(--pref-accent);
   --accent-soft: color-mix(in srgb, var(--pref-accent) 16%, transparent);
 }
 
-:root[data-accent] .workspace[data-theme="light"] {
+:root[data-accent] .workspace[data-theme="light"],
+:root[data-accent] .workspace[data-theme="white"] {
   --accent: var(--pref-accent-light);
   --accent-soft: color-mix(in srgb, var(--pref-accent-light) 12%, transparent);
 }
@@ -202,5 +208,33 @@
 @media (max-width: 720px) {
   .preference-inline input[type="range"] {
     width: 100px;
+  }
+}
+
+/* White controls keep dark labels and a visible edge on light surfaces. */
+:root[data-accent="white"] .workspace {
+  --button-text: #171717;
+}
+
+:root[data-accent="white"] .workspace[data-theme="light"],
+:root[data-accent="white"] .workspace[data-theme="white"] {
+  --accent: #595959;
+  --accent-soft: #0000000c;
+  --button-text: #ffffff;
+}
+
+:root[data-accent="white"]
+  .workspace
+  :is(.button.primary, .play-button, .album-play) {
+  background: #ffffff;
+  color: #171717;
+  border-color: #767676;
+}
+
+@media (prefers-color-scheme: light) {
+  :root[data-accent="white"] .workspace[data-theme="system"] {
+    --accent: #595959;
+    --accent-soft: #0000000c;
+    --button-text: #ffffff;
   }
 }

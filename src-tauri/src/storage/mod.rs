@@ -361,7 +361,9 @@ impl StorageManager {
         if !schema::is_valid_theme(theme) {
             return Err(StorageError::InvalidValue {
                 field: "theme".to_string(),
-                message: format!("use light, dark o system, no {theme}"),
+                message: format!(
+                    "use dark, black, light, white, violet, purple o system, no {theme}"
+                ),
             });
         }
         let mut appearance = self.load_appearance()?;

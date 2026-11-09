@@ -4,6 +4,7 @@ The settings center is available under Configuración → Preferencias. Seven se
 
 ## Behavior
 
+- Themes are distinct: Oscuro (charcoal), Negro (black), Claro (light gray), Blanco (white), Violeta (default), and Morado (deeper purple), plus Automático. White is also available as an accent. Existing saved themes remain selected.
 - Appearance applies globally: theme, accent, interface scale (75–200%), reduced animations, background, player layout, and lyric layout.
 - Playback defaults apply on startup only when no queue/session is restored. Volume, shuffle, and repeat also apply immediately when changed in settings.
 - Lyrics supports local/embedded/LRCLIB selection, size, font, colors, and global offset. External access still requires the existing provider permission. Local and embedded proposals honor the chosen providers.

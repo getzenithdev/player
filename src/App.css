@@ -103,30 +103,66 @@ input[type="checkbox"] {
   height: 100dvh;
   overflow: hidden;
 }
-.workspace[data-theme="light"] {
-  --canvas: #f9f6fc;
-  --surface: #fff;
-  --text: #2a1937;
-  --muted: #71607e;
-  --line: #4626581b;
+.workspace[data-theme="dark"],
+.workspace[data-theme="system"] {
+  --canvas: #171717;
+  --surface: #222222;
+  --text: #f5f5f5;
+  --muted: #aaaaaa;
+  --line: #ffffff20;
+  --hover: #ffffff0c;
+  --sidebar: #1c1c1c;
+  --button-text: #171717;
+}
+.workspace[data-theme="black"] {
+  --canvas: #000000;
+  --surface: #0a0a0a;
+  --text: #ffffff;
+  --muted: #aaaaaa;
+  --line: #ffffff20;
+  --hover: #ffffff0c;
+  --sidebar: #050505;
+  --button-text: #000000;
+}
+.workspace[data-theme="purple"] {
+  --canvas: #200d30;
+  --surface: #301445;
+  --text: #faf0ff;
+  --muted: #c1a4d3;
+  --line: #dfb6ff28;
+  --hover: #e7c9fa14;
+  --sidebar: #280f39;
+}
+.workspace[data-theme="light"],
+.workspace[data-theme="white"] {
+  --canvas: #f1f1f1;
+  --surface: #fafafa;
+  --text: #222222;
+  --muted: #666666;
+  --line: #00000020;
   --accent: #80509d;
   --accent-soft: #9e70b51a;
-  --hover: #9e70b50e;
-  --sidebar: #f0eaf6;
+  --hover: #00000008;
+  --sidebar: #e7e7e7;
   --button-text: #fff;
   color-scheme: light;
 }
+.workspace[data-theme="white"] {
+  --canvas: #ffffff;
+  --surface: #ffffff;
+  --sidebar: #f7f7f7;
+}
 @media (prefers-color-scheme: light) {
   .workspace[data-theme="system"] {
-    --canvas: #f9f6fc;
-    --surface: #fff;
-    --text: #2a1937;
-    --muted: #71607e;
-    --line: #4626581b;
+    --canvas: #f1f1f1;
+    --surface: #fafafa;
+    --text: #222222;
+    --muted: #666666;
+    --line: #00000020;
     --accent: #80509d;
     --accent-soft: #9e70b51a;
-    --hover: #9e70b50e;
-    --sidebar: #f0eaf6;
+    --hover: #00000008;
+    --sidebar: #e7e7e7;
     --button-text: #fff;
     color-scheme: light;
   }
@@ -403,7 +439,8 @@ input[type="checkbox"] {
   --accent-soft: #f1dcff3d;
   --button-text: #14091f;
 }
-.workspace[data-high-contrast="true"][data-theme="light"] {
+.workspace[data-high-contrast="true"][data-theme="light"],
+.workspace[data-high-contrast="true"][data-theme="white"] {
   --line: #2a193766;
   --muted: #4d3a5c;
   --hover: #6b438412;

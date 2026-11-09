@@ -49,7 +49,7 @@ export const defaultLyrics: LyricsSnapshot = {
     font: "system",
     color: "#777777",
     active_color: "#8956dd",
-    external: false,
+    external: true,
   },
   candidates: [],
   warnings: [],

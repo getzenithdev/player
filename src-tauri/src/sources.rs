@@ -176,7 +176,7 @@ impl Secrets {
     }
 }
 
-#[derive(Debug, Clone, Default, Serialize, Deserialize)]
+#[derive(Debug, Clone, Serialize, Deserialize)]
 #[serde(default)]
 struct Document {
     external: bool,
@@ -185,6 +185,18 @@ struct Document {
     /// Completed cache files explicitly requested with Download, keyed by filename.
     downloads: BTreeMap<String, String>,
     cached_results: BTreeMap<String, Entry>,
+}
+
+impl Default for Document {
+    fn default() -> Self {
+        Self {
+            external: true,
+            connections: BTreeMap::new(),
+            settings: BTreeMap::new(),
+            downloads: BTreeMap::new(),
+            cached_results: BTreeMap::new(),
+        }
+    }
 }
 
 /// One browsable or searchable item returned by a provider.

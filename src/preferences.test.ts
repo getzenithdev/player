@@ -7,6 +7,7 @@ import {
   normalizeSettings,
   resetSettings,
   saveSettings,
+  themes,
   type AppSettings,
 } from "./preferences";
 
@@ -14,11 +15,28 @@ describe("central preferences", () => {
   it("keeps the documented defaults valid", () => {
     const settings = normalizeSettings(defaultSettings);
     expect(settings).toEqual(defaultSettings);
+    expect(settings.appearance.theme).toBe("violet");
     expect(settings.general.confirmDestructive).toBe(true);
     expect(settings.playback.initialVolume).toBe(70);
     expect(settings.lyrics.providers).toEqual(["local", "embedded", "lrclib"]);
     expect(settings.artwork.allowDownloads).toBe(false);
   });
+
+  it.each(themes)(
+    "preserves the $label theme and white accent",
+    ({ value }) => {
+      const settings = normalizeSettings({
+        ...defaultSettings,
+        appearance: {
+          ...defaultSettings.appearance,
+          theme: value,
+          accent: "white",
+        },
+      });
+      expect(settings.appearance.theme).toBe(value);
+      expect(settings.appearance.accent).toBe("white");
+    },
+  );
 
   it("clamps ranges and repairs enum values", () => {
     const settings = normalizeSettings({
@@ -51,7 +69,7 @@ describe("central preferences", () => {
     });
     expect(settings.general.language).toBe("es");
     expect(settings.appearance.accent).toBe("violet");
-    expect(settings.appearance.theme).toBe("light");
+    expect(settings.appearance.theme).toBe("violet");
     expect(settings.appearance.scale).toBe(200);
     expect(settings.playback.initialVolume).toBe(100);
     expect(settings.playback.repeat).toBe("off");

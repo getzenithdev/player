@@ -9,7 +9,7 @@ import { invoke, isTauri } from "@tauri-apps/api/core";
  * data attributes and CSS variables, so they survive route changes.
  */
 
-export type Accent = "violet" | "plum" | "rose" | "teal" | "amber";
+export type Accent = "violet" | "plum" | "rose" | "teal" | "amber" | "white";
 export type AnimationMode = "full" | "reduced";
 export type BackgroundMode = "dynamic" | "solid";
 export type PlayerLayout = "full" | "compact";
@@ -78,7 +78,7 @@ export interface SettingsSnapshot {
 export const defaultSettings: AppSettings = {
   general: { language: "es", confirmDestructive: true },
   appearance: {
-    theme: "light",
+    theme: "violet",
     accent: "violet",
     scale: 100,
     animations: "full",
@@ -105,12 +105,23 @@ export const defaultSettings: AppSettings = {
   },
 };
 
+export const themes = [
+  { value: "dark", label: "Oscuro" },
+  { value: "black", label: "Negro" },
+  { value: "light", label: "Claro" },
+  { value: "white", label: "Blanco" },
+  { value: "violet", label: "Violeta" },
+  { value: "purple", label: "Morado" },
+  { value: "system", label: "Automático" },
+];
+
 export const accents: { value: Accent; label: string; color: string }[] = [
   { value: "violet", label: "Violeta", color: "#d0afe5" },
   { value: "plum", label: "Ciruela", color: "#c48fd6" },
   { value: "rose", label: "Rosa", color: "#eda6bc" },
   { value: "teal", label: "Verde azulado", color: "#8fd6cf" },
   { value: "amber", label: "Ámbar", color: "#e9c48c" },
+  { value: "white", label: "Blanco", color: "#ffffff" },
 ];
 
 export const lyricProviders: {
@@ -131,7 +142,7 @@ export const artworkProviders: { value: ArtworkProvider; label: string }[] = [
 ];
 
 const LANGUAGES: Language[] = ["es", "system"];
-const ACCENTS: Accent[] = ["violet", "plum", "rose", "teal", "amber"];
+const ACCENTS: Accent[] = ["violet", "plum", "rose", "teal", "amber", "white"];
 const ANIMATIONS: AnimationMode[] = ["full", "reduced"];
 const BACKGROUNDS: BackgroundMode[] = ["dynamic", "solid"];
 const PLAYER_LAYOUTS: PlayerLayout[] = ["full", "compact"];
@@ -217,7 +228,11 @@ export function normalizeSettings(settings: AppSettings): AppSettings {
       confirmDestructive: Boolean(general.confirmDestructive),
     },
     appearance: {
-      theme: oneOf(appearance.theme, ["light", "dark", "system"], "light"),
+      theme: oneOf(
+        appearance.theme,
+        themes.map((theme) => theme.value),
+        "violet",
+      ),
       accent: oneOf(appearance.accent, ACCENTS, "violet"),
       scale: Math.round(clamp(appearance.scale, MIN_SCALE, MAX_SCALE, 100)),
       animations: oneOf(appearance.animations, ANIMATIONS, "full"),

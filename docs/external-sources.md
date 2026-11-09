@@ -2,7 +2,7 @@
 
 ## Contract
 
-Every provider implements the same contract in `src-tauri/src/sources.rs`: a declared set of capabilities, a connection state, network operations behind an explicit opt-in, and credentials that live in the operating system credential store. The interface never offers an action the provider does not declare.
+Every provider implements the same contract in `src-tauri/src/sources.rs`: a declared set of capabilities, a connection state, network operations controlled by a persistent switch, enabled by default, and credentials that live in the operating system credential store. The interface never offers an action the provider does not declare.
 
 | Provider | Auth | Capabilities | Notes |
 | --- | --- | --- | --- |
@@ -63,7 +63,7 @@ Validation recorded on Windows x64, 2026-11-02: `npm run check` passed (28 front
 
 ## Español
 
-La fase 9 conecta servicios externos mediante un contrato común: cada proveedor declara sus capacidades y la interfaz solo ofrece las acciones que declara. Las contraseñas, claves y tokens viven en el almacén de credenciales del sistema; `config/providers.json` guarda únicamente conexiones y ajustes, y la exportación de datos nunca lo incluye. Las consultas externas siguen desactivadas hasta que las permites explícitamente.
+La fase 9 conecta servicios externos mediante un contrato común: cada proveedor declara sus capacidades y la interfaz solo ofrece las acciones que declara. Las contraseñas, claves y tokens viven en el almacén de credenciales del sistema; `config/providers.json` guarda únicamente conexiones y ajustes, y la exportación de datos nunca lo incluye. Las consultas externas están activadas por defecto; puedes desactivarlas desde Fuentes y se respeta esa preferencia al reiniciar.
 
 YouTube automático es la opción principal, sin clave, con búsqueda y preparación de audio AAC/M4A mediante yt-dlp local. YouTube API queda como alternativa independiente de búsqueda y metadatos con tu propia clave, con reproducción mediante el motor automático y sin descarga desde la API. Google Drive, Dropbox y OneDrive usan OAuth 2.0 con PKCE y tu propio ID de cliente, con autorización en el navegador y caducidad gestionada; WebDAV exige HTTPS con usuario y contraseña. Las descargas se guardan en la caché local y se reproducen con el motor de audio, de modo que la biblioteca local sigue funcionando con la red caída o las autorizaciones caducadas. Falta la aceptación manual con credenciales reales en las aplicaciones instaladas.
 

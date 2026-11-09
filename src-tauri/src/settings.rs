@@ -25,7 +25,7 @@ use crate::{
 pub const SETTINGS_DOCUMENT: &str = "config/settings.json";
 
 const LANGUAGES: [&str; 2] = ["es", "system"];
-const ACCENTS: [&str; 5] = ["violet", "plum", "rose", "teal", "amber"];
+const ACCENTS: [&str; 6] = ["violet", "plum", "rose", "teal", "amber", "white"];
 const ANIMATIONS: [&str; 2] = ["full", "reduced"];
 const BACKGROUNDS: [&str; 2] = ["dynamic", "solid"];
 const PLAYER_LAYOUTS: [&str; 2] = ["full", "compact"];
@@ -80,7 +80,7 @@ pub struct AppearanceSettings {
 impl Default for AppearanceSettings {
     fn default() -> Self {
         Self {
-            theme: "light".into(),
+            theme: "violet".into(),
             accent: "violet".into(),
             scale: 100,
             animations: "full".into(),
@@ -291,7 +291,7 @@ impl AppSettings {
             self.general.language = "es".into();
         }
         if !schema::is_valid_theme(&self.appearance.theme) {
-            self.appearance.theme = "light".into();
+            self.appearance.theme = "violet".into();
         }
         if !ACCENTS.contains(&self.appearance.accent.as_str()) {
             self.appearance.accent = "violet".into();
@@ -550,12 +550,30 @@ mod tests {
         settings.validate().unwrap();
         assert_eq!(settings.general.language, "es");
         assert!(settings.general.confirm_destructive);
+        assert_eq!(settings.appearance.theme, "violet");
         assert_eq!(settings.appearance.scale, 100);
         assert_eq!(settings.playback.initial_volume, 70);
         assert_eq!(settings.lyrics.size, 30);
         assert_eq!(settings.lyrics.providers, ["local", "embedded", "lrclib"]);
         assert_eq!(settings.artwork.provider_priority, ARTWORK_PROVIDERS);
         assert!(!settings.artwork.allow_downloads);
+    }
+
+    #[test]
+    fn every_theme_and_white_accent_survive_a_restart() {
+        let (root, storage) = storage("themes");
+        for theme in schema::THEMES {
+            let mut settings = AppSettings::default();
+            settings.appearance.theme = theme.into();
+            settings.appearance.accent = "white".into();
+            save(&storage, settings).unwrap();
+            let reopened = StorageManager::open(root.join("data"), false).unwrap();
+            let restored = load(&reopened).unwrap().settings;
+            assert_eq!(restored.appearance.theme, theme);
+            assert_eq!(restored.appearance.accent, "white");
+            assert_eq!(reopened.load_appearance().unwrap().theme, theme);
+        }
+        fs::remove_dir_all(root).unwrap();
     }
 
     #[test]

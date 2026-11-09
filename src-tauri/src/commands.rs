@@ -27,7 +27,7 @@ pub fn appearance_get(manager: State<'_, StorageManager>) -> Result<AppearanceDa
     manager.load_appearance().map_err(|error| error.to_string())
 }
 
-/// Persists one of the accepted themes (`light`, `dark`, `system`).
+/// Persists one of the accepted themes (`dark`, `black`, `light`, `white`, `violet`, `purple`, `system`).
 #[tauri::command]
 pub fn appearance_save(
     manager: State<'_, StorageManager>,

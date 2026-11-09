@@ -26,10 +26,24 @@ type IconName =
   | "close"
   | "expand"
   | "minimize"
+  | "sidebarExpand"
+  | "sidebarCollapse"
   | "plus";
 
 export function Icon({ name, size = 20 }: { name: IconName; size?: number }) {
   const paths: Record<IconName, ReactNode> = {
+    sidebarExpand: (
+      <>
+        <rect x="3" y="4" width="18" height="16" rx="3" />
+        <path d="M9 4v16m4-11 3 3-3 3" />
+      </>
+    ),
+    sidebarCollapse: (
+      <>
+        <rect x="3" y="4" width="18" height="16" rx="3" />
+        <path d="M9 4v16m7-11-3 3 3 3" />
+      </>
+    ),
     minimize: <path d="m5 9 7 7 7-7" />,
     home: (
       <>

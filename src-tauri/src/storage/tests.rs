@@ -119,7 +119,7 @@ fn missing_documents_report_defaults() {
             .unwrap()
             .is_none()
     );
-    assert_eq!(manager.load_appearance().unwrap().theme, "light");
+    assert_eq!(manager.load_appearance().unwrap().theme, "violet");
     let status = manager.status();
     assert_eq!(
         status.documents.len(),
@@ -661,7 +661,7 @@ fn degraded_storage_keeps_the_application_running() {
     assert!(manager.export_bundle().is_err());
     assert!(manager.clear_cache().is_err());
     if let Ok(appearance) = manager.load_appearance() {
-        assert_eq!(appearance.theme, "light");
+        assert_eq!(appearance.theme, "violet");
     }
 }
 

@@ -712,12 +712,12 @@
   overflow: hidden;
 }
 .dark-preview {
-  background: #100a19;
-  color: #e6d8ed;
+  background: #171717;
+  color: #f5f5f5;
 }
 .light-preview {
-  background: #faf7fd;
-  color: #392247;
+  background: #f1f1f1;
+  color: #222222;
 }
 .theme-preview i {
   display: block;

@@ -48,11 +48,13 @@ impl Default for AppearanceData {
 }
 
 fn default_theme() -> String {
-    "light".to_string()
+    "violet".to_string()
 }
 
 /// Themes accepted by the interface.
-pub const THEMES: [&str; 3] = ["light", "dark", "system"];
+pub const THEMES: [&str; 7] = [
+    "dark", "black", "light", "white", "violet", "purple", "system",
+];
 
 pub fn is_valid_theme(theme: &str) -> bool {
     THEMES.contains(&theme)

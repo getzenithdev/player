@@ -38,6 +38,7 @@ import { libraryAction, type LibraryView } from "./library";
 import "./App.css";
 import "./Experience.css";
 import "./Refinement.css";
+import "./Navigation.css";
 
 const libraryRoutes: Partial<Record<AppView, LibraryView>> = {
   library: "Canciones",
@@ -50,7 +51,28 @@ const libraryRoutes: Partial<Record<AppView, LibraryView>> = {
 export default function App() {
   const [view, setView] = useState<AppView>("home");
   const [playerExpanded, setPlayerExpanded] = useState(false);
-  const [theme, setTheme] = useState("dark");
+  const [sidebarCollapsed, setSidebarCollapsed] = useState(() => {
+    try {
+      return (
+        localStorage.getItem("zenith.sidebar.collapsed") === "true" ||
+        window.matchMedia("(max-width: 900px)").matches
+      );
+    } catch {
+      return false;
+    }
+  });
+  function toggleSidebar() {
+    setSidebarCollapsed((collapsed) => {
+      const next = !collapsed;
+      try {
+        localStorage.setItem("zenith.sidebar.collapsed", String(next));
+      } catch {
+        // The control remains usable when browser storage is unavailable.
+      }
+      return next;
+    });
+  }
+  const [theme, setTheme] = useState("violet");
   const [query, setQuery] = useState("");
   const [libraryQuery, setLibraryQuery] = useState("");
   const [picking, setPicking] = useState(false);
@@ -73,6 +95,9 @@ export default function App() {
       t.local_path === audio.state.track?.path,
   );
   function navigate(next: AppView) {
+    if (window.matchMedia("(max-width: 900px)").matches) {
+      setSidebarCollapsed(true);
+    }
     if (next === "nowPlaying") {
       setPlayerExpanded(true);
       return;
@@ -323,7 +348,7 @@ export default function App() {
   }
   return (
     <div
-      className="workspace"
+      className={`workspace ${sidebarCollapsed ? "sidebar-collapsed" : "sidebar-expanded"}`}
       data-theme={theme}
       {...accessibilityAttributes(integration)}
       style={{ "--artwork-color": accent } as CSSProperties}
@@ -359,7 +384,28 @@ export default function App() {
       >
         {announcement}
       </p>
-      <aside className="sidebar">
+      {!sidebarCollapsed && (
+        <button
+          className="sidebar-backdrop"
+          aria-label="Cerrar navegación"
+          onClick={toggleSidebar}
+        />
+      )}
+      <aside
+        className="sidebar"
+        id="sidebar"
+        onKeyDown={(event) => {
+          if (
+            event.key === "Escape" &&
+            window.matchMedia("(max-width: 900px)").matches
+          ) {
+            setSidebarCollapsed(true);
+            main.current
+              ?.querySelector<HTMLButtonElement>(".sidebar-mobile-toggle")
+              ?.focus();
+          }
+        }}
+      >
         <button
           className="brand"
           onClick={() => navigate("home")}
@@ -368,7 +414,26 @@ export default function App() {
           <img src="/favicon.svg" width="36" height="36" alt="" />
           <span>Zenith</span>
         </button>
-        <nav aria-label="Navegación principal">
+        <button
+          className="sidebar-toggle"
+          onClick={toggleSidebar}
+          aria-label={
+            sidebarCollapsed
+              ? "Expandir barra lateral"
+              : "Retraer barra lateral"
+          }
+          title={
+            sidebarCollapsed
+              ? "Expandir barra lateral"
+              : "Retraer barra lateral"
+          }
+          aria-expanded={!sidebarCollapsed}
+          aria-controls="sidebar-navigation"
+        >
+          <Icon name={sidebarCollapsed ? "sidebarExpand" : "sidebarCollapse"} />
+          <span>Retraer menú</span>
+        </button>
+        <nav id="sidebar-navigation" aria-label="Navegación principal">
           {["main", "library", "collection", "settings"].map((group) => (
             <div className={`nav-group nav-group-${group}`} key={group}>
               {group === "library" && <p className="nav-heading">Biblioteca</p>}
@@ -385,6 +450,9 @@ export default function App() {
                   >
                     <Icon name={item.view} size={19} />
                     <span>{item.label}</span>
+                    <span className="sidebar-tooltip" aria-hidden="true">
+                      {item.label}
+                    </span>
                     {item.view === "favorites" &&
                       library.tracks.some((t) => t.favorite) && (
                         <small>
@@ -399,6 +467,15 @@ export default function App() {
       </aside>
       <main ref={main} id="main-content" tabIndex={-1}>
         <header className="page-header">
+          <button
+            className="sidebar-mobile-toggle icon-button"
+            onClick={toggleSidebar}
+            aria-label="Abrir navegación"
+            aria-expanded={!sidebarCollapsed}
+            aria-controls="sidebar"
+          >
+            <Icon name="sidebarExpand" />
+          </button>
           <div className="page-heading">
             <h1>{viewTitle(view)}</h1>
           </div>
@@ -466,7 +543,9 @@ export default function App() {
       {playerExpanded && (
         <ExpandedPlayer
           audio={audio}
-          lightweightMotion={integrationSnapshot?.lightweightPlayerMotion ?? false}
+          lightweightMotion={
+            integrationSnapshot?.lightweightPlayerMotion ?? false
+          }
           current={current}
           navigate={navigate}
           onOpenFiles={() => void openFiles()}

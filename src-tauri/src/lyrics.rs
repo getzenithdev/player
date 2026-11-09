@@ -190,7 +190,7 @@ impl Default for Preferences {
             font: "system".into(),
             color: "#777777".into(),
             active_color: "#8956dd".into(),
-            external: false,
+            external: true,
         }
     }
 }
@@ -651,6 +651,15 @@ mod tests {
         let root =
             std::env::temp_dir().join(format!("zenith-lyrics-test-{}", rand::random::<u64>()));
         let s = StorageManager::open(root.clone(), true).unwrap();
+        assert!(load_preferences(&s).unwrap().external);
+        save_preferences(
+            &s,
+            Preferences {
+                external: false,
+                ..Preferences::default()
+            },
+        )
+        .unwrap();
         library::save(
             &s,
             &crate::storage::indexes::TracksDocument {
@@ -674,6 +683,7 @@ mod tests {
         let id = a.saved.selected.unwrap().id;
         drop(s);
         let s = StorageManager::open(root.clone(), true).unwrap();
+        assert!(!load_preferences(&s).unwrap().external);
         assert!(
             execute(&s, "track".into(), Action::Snapshot)
                 .unwrap()

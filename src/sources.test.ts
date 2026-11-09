@@ -156,7 +156,7 @@ it("formats sizes and keeps an empty snapshot", () => {
   expect(emptySources).toEqual({
     providers: [],
     results: [],
-    external: false,
+    external: true,
     pending_url: null,
     downloaded: null,
     warnings: [],

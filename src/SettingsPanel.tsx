@@ -1,3 +1,4 @@
+import { themes } from "./preferences";
 import { useEffect, useState, type ReactNode } from "react";
 import type { AudioController } from "./audio";
 import {
@@ -177,16 +178,18 @@ export function Settings({
           <>
             <Setting
               title="Tema"
-              description="Automático sigue el tema de tu equipo."
+              description="Violeta es el tema predeterminado. Automático sigue el tema de tu equipo."
             >
               <select
                 aria-label="Tema de la interfaz"
                 value={theme}
                 onChange={(e) => onTheme(e.target.value)}
               >
-                <option value="dark">Oscuro</option>
-                <option value="light">Claro</option>
-                <option value="system">Automático</option>
+                {themes.map((theme) => (
+                  <option key={theme.value} value={theme.value}>
+                    {theme.label}
+                  </option>
+                ))}
               </select>
             </Setting>
             <div className="theme-previews" aria-hidden="true">
