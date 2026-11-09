@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useRef, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { isTauri } from "@tauri-apps/api/core";
 import { listen } from "@tauri-apps/api/event";
 import { open } from "@tauri-apps/plugin-dialog";
@@ -120,14 +120,20 @@ export function Library({
       setBusy(false);
     }
   }
-  const tracks = selectTracks(library, view, query);
-  const groups = new Map<string, LibraryTrack[]>();
-  for (const track of tracks) {
-    const key = groupIdentity(track, view);
-    const items = groups.get(key);
-    if (items) items.push(track);
-    else groups.set(key, [track]);
-  }
+  const tracks = useMemo(
+    () => selectTracks(library, view, query),
+    [library, view, query],
+  );
+  const groups = useMemo(() => {
+    const result = new Map<string, LibraryTrack[]>();
+    for (const track of tracks) {
+      const key = groupIdentity(track, view);
+      const items = result.get(key);
+      if (items) items.push(track);
+      else result.set(key, [track]);
+    }
+    return result;
+  }, [tracks, view]);
   function play(selected: LibraryTrack) {
     const playable = tracks.filter(
       (t) =>

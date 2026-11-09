@@ -145,15 +145,19 @@ export function useAudioEngine() {
         );
         attach(
           await listen<PositionEvent>("audio:position", (event) => {
-            setSnapshot((previous) =>
-              previous
-                ? {
-                    ...previous,
-                    positionMs: event.payload.positionMs,
-                    durationMs: event.payload.durationMs ?? previous.durationMs,
-                  }
-                : previous,
-            );
+            setSnapshot((previous) => {
+              if (!previous) return previous;
+              const { positionMs } = event.payload;
+              const durationMs =
+                event.payload.durationMs ?? previous.durationMs;
+              if (
+                previous.positionMs === positionMs &&
+                previous.durationMs === durationMs
+              ) {
+                return previous;
+              }
+              return { ...previous, positionMs, durationMs };
+            });
           }),
         );
       } catch (reason) {

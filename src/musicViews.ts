@@ -8,7 +8,9 @@ export function albumGroups(tracks: LibraryTrack[]) {
   const groups = new Map<string, LibraryTrack[]>();
   for (const track of tracks) {
     const key = groupIdentity(track, "Álbumes");
-    groups.set(key, [...(groups.get(key) ?? []), track]);
+    const items = groups.get(key);
+    if (items) items.push(track);
+    else groups.set(key, [track]);
   }
   return [...groups.values()];
 }

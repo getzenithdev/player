@@ -1,4 +1,4 @@
-import { useEffect, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { isTauri } from "@tauri-apps/api/core";
 import { listen } from "@tauri-apps/api/event";
 import type { AudioController } from "./audio";
@@ -24,21 +24,23 @@ export function useResourceTrack(audio: AudioController) {
     const cleanup = isTauri()
       ? listen("library:changed", reload)
       : Promise.resolve(() => {});
-    void cleanup.then(() => { if (!disposed) reload(); });
+    void cleanup.then(() => {
+      if (!disposed) reload();
+    });
     return () => {
       disposed = true;
       void cleanup.then((f) => f());
     };
   }, [current?.trackId, current?.path]);
-  const track =
-    tracks.find((t) => t.id === chosen) ??
-    tracks.find((t) => !!current?.trackId && t.id === current.trackId) ??
-    tracks.find((t) => !!current?.path && t.local_path === current.path);
-  return {
-    tracks,
-    track,
-    error,
-    selector: (
+  const track = useMemo(
+    () =>
+      tracks.find((t) => t.id === chosen) ??
+      tracks.find((t) => !!current?.trackId && t.id === current.trackId) ??
+      tracks.find((t) => !!current?.path && t.local_path === current.path),
+    [tracks, chosen, current?.trackId, current?.path],
+  );
+  const selector = useMemo(
+    () => (
       <label className="resource-track">
         Canción
         <select
@@ -54,5 +56,7 @@ export function useResourceTrack(audio: AudioController) {
         </select>
       </label>
     ),
-  };
+    [tracks, chosen],
+  );
+  return { tracks, track, error, selector };
 }

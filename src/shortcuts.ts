@@ -1,4 +1,4 @@
-import { useEffect } from "react";
+import { useEffect, useLayoutEffect, useRef } from "react";
 
 /** Action produced by a window-level keyboard shortcut. */
 export type ShortcutAction =
@@ -118,9 +118,9 @@ export function useGlobalShortcuts(
     durationMs,
   } = handlers;
 
-  useEffect(() => {
-    if (!enabled) return;
-    const onKeyDown = (event: KeyboardEvent) => {
+  const onKeyDown = useRef<(event: KeyboardEvent) => void>(() => {});
+  useLayoutEffect(() => {
+    onKeyDown.current = (event: KeyboardEvent) => {
       const action = resolveShortcut(shortcutEvent(event));
       if (!action) return;
       event.preventDefault();
@@ -146,17 +146,11 @@ export function useGlobalShortcuts(
           break;
       }
     };
-    window.addEventListener("keydown", onKeyDown);
-    return () => window.removeEventListener("keydown", onKeyDown);
-  }, [
-    enabled,
-    toggle,
-    next,
-    previous,
-    seek,
-    setMuted,
-    muted,
-    positionMs,
-    durationMs,
-  ]);
+  });
+  useEffect(() => {
+    if (!enabled) return;
+    const listener = (event: KeyboardEvent) => onKeyDown.current(event);
+    window.addEventListener("keydown", listener);
+    return () => window.removeEventListener("keydown", listener);
+  }, [enabled]);
 }

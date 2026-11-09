@@ -1,4 +1,4 @@
-import { useEffect, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import type { AudioController } from "./audio";
 import { Icon } from "./Icon";
 import { TrackArtwork } from "./TrackArtwork";
@@ -90,14 +90,30 @@ export function Home({
       t.id === audio.state.track?.trackId ||
       t.local_path === audio.state.track?.path,
   );
-  const recent = [...tracks]
-    .sort((a, b) => (b.last_played ?? 0) - (a.last_played ?? 0))
-    .filter((t) => t.last_played);
-  const added = [...tracks].sort((a, b) => b.added_at - a.added_at);
-  const favorites = tracks.filter((t) => t.favorite);
-  const mostPlayed = [...tracks]
-    .filter((t) => t.play_count > 0)
-    .sort((a, b) => b.play_count - a.play_count);
+  const {
+    recent,
+    added,
+    mostPlayed,
+    recentAlbums,
+    addedAlbums,
+    favoriteAlbums,
+  } = useMemo(() => {
+    const recent = tracks
+      .filter((t) => t.last_played)
+      .sort((a, b) => (b.last_played ?? 0) - (a.last_played ?? 0));
+    const added = [...tracks].sort((a, b) => b.added_at - a.added_at);
+    const mostPlayed = tracks
+      .filter((t) => t.play_count > 0)
+      .sort((a, b) => b.play_count - a.play_count);
+    return {
+      recent,
+      added,
+      mostPlayed,
+      recentAlbums: albumGroups(recent),
+      addedAlbums: albumGroups(added),
+      favoriteAlbums: albumGroups(tracks.filter((t) => t.favorite)),
+    };
+  }, [tracks]);
   const featured = current ?? recent[0] ?? added[0];
   return (
     <div className="home-screen">
@@ -167,19 +183,19 @@ export function Home({
       </section>
       <AlbumShelf
         title="Recientes"
-        groups={albumGroups(recent)}
+        groups={recentAlbums}
         audio={audio}
         onBrowse={() => navigate("history")}
       />
       <AlbumShelf
         title="Añadidos recientemente"
-        groups={albumGroups(added)}
+        groups={addedAlbums}
         audio={audio}
         onBrowse={() => navigate("albums")}
       />
       <AlbumShelf
         title="Favoritos"
-        groups={albumGroups(favorites)}
+        groups={favoriteAlbums}
         audio={audio}
         onBrowse={() => navigate("favorites")}
       />
@@ -255,11 +271,16 @@ export function Search({
     search: ReturnType<typeof searchExternalSources> | null;
   }>({ query: "", revision: 0, search: null });
   const lists = usePlaylists();
-  const matched = searchMusic(tracks, query);
-  const albums = albumGroups(matched);
-  const artists = [
-    ...new Map(matched.map((t) => [groupIdentity(t, "Artistas"), t])).values(),
-  ];
+  const matched = useMemo(() => searchMusic(tracks, query), [tracks, query]);
+  const albums = useMemo(() => albumGroups(matched), [matched]);
+  const artists = useMemo(
+    () => [
+      ...new Map(
+        matched.map((t) => [groupIdentity(t, "Artistas"), t]),
+      ).values(),
+    ],
+    [matched],
+  );
   const playlists = query.trim()
     ? lists.playlists.filter((p) =>
         p.name.toLocaleLowerCase().includes(query.trim().toLocaleLowerCase()),

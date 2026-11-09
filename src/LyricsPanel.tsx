@@ -1,4 +1,11 @@
-import { useEffect, useRef, useState, type CSSProperties } from "react";
+import {
+  memo,
+  useEffect,
+  useMemo,
+  useRef,
+  useState,
+  type CSSProperties,
+} from "react";
 import { open, save } from "@tauri-apps/plugin-dialog";
 import type { AudioController } from "./audio";
 import {
@@ -10,10 +17,25 @@ import {
   lyricsAction,
   type LyricsPreferences,
   type LyricsSnapshot,
+  type LyricWord,
 } from "./lyrics";
 import { useResourceTrack } from "./ResourceTrack";
 import "./Resources.css";
 import { TrackArtwork } from "./TrackArtwork";
+
+const LyricWords = memo(function LyricWords({
+  words,
+  sung,
+}: {
+  words: LyricWord[];
+  sung: number;
+}) {
+  return words.map((word, index) => (
+    <span className={index <= sung ? "sung" : ""} key={index}>
+      {word.text}
+    </span>
+  ));
+});
 
 // CSS cubic-bezier(0.77, 0, 0.175, 1), shared by each scroll retarget.
 function lyricScrollEase(progress: number) {
@@ -22,8 +44,8 @@ function lyricScrollEase(progress: number) {
   let high = 1;
   for (let i = 0; i < 16; i++) {
     const t = (low + high) / 2;
-    const x = 3 * (1 - t) ** 2 * t * 0.77 +
-      3 * (1 - t) * t ** 2 * 0.175 + t ** 3;
+    const x =
+      3 * (1 - t) ** 2 * t * 0.77 + 3 * (1 - t) * t ** 2 * 0.175 + t ** 3;
     if (x < progress) low = t;
     else high = t;
   }
@@ -56,7 +78,12 @@ export function Lyrics({
   const active = useRef<HTMLParagraphElement>(null);
   const generation = useRef(0);
   const trackId = track?.id;
-  const trackMetadata = JSON.stringify([track?.title, track?.artist, track?.album, track?.duration]);
+  const trackMetadata = JSON.stringify([
+    track?.title,
+    track?.artist,
+    track?.album,
+    track?.duration,
+  ]);
   useEffect(() => {
     setFollowing(true);
   }, [trackId]);
@@ -72,7 +99,11 @@ export function Lyrics({
             setEditor(null);
             setError("");
             setBusy(false);
-            if (!displayedLyrics(s) && !s.saved.suppress_local && s.preferences.external) {
+            if (
+              !displayedLyrics(s) &&
+              !s.saved.suppress_local &&
+              s.preferences.external
+            ) {
               setBusy(true);
               try {
                 const discovered = await discoverLyrics(trackId, trackMetadata);
@@ -100,16 +131,19 @@ export function Lyrics({
     document.addEventListener("fullscreenchange", change);
     return () => document.removeEventListener("fullscreenchange", change);
   }, []);
-  const candidate =
-    loadedTrackId !== trackId
-      ? null
-      : displayedLyrics(snapshot);
+  const candidate = useMemo(
+    () => (loadedTrackId !== trackId ? null : displayedLyrics(snapshot)),
+    [loadedTrackId, trackId, snapshot],
+  );
   const preferences = snapshot.preferences;
-  const isPlayingTrack = !!track &&
+  const isPlayingTrack =
+    !!track &&
     (audio.state.track?.trackId === track.id ||
       audio.state.track?.path === track.local_path);
   const position = isPlayingTrack ? audio.state.positionMs : 0;
-  const canSeek = audio.available && isPlayingTrack &&
+  const canSeek =
+    audio.available &&
+    isPlayingTrack &&
     ["playing", "paused"].includes(audio.state.status);
   const offset =
     preferences.offset +
@@ -124,12 +158,17 @@ export function Lyrics({
       const rect = node.getBoundingClientRect();
       const parent = pane.getBoundingClientRect();
       const start = pane.scrollTop;
-      const target = Math.max(0, Math.min(pane.scrollHeight - pane.clientHeight,
+      const target = Math.max(
+        0,
+        Math.min(
+          pane.scrollHeight - pane.clientHeight,
           pane.scrollTop +
-          rect.top -
-          parent.top -
-          pane.clientHeight / 2 +
-          rect.height / 2));
+            rect.top -
+            parent.top -
+            pane.clientHeight / 2 +
+            rect.height / 2,
+        ),
+      );
       const preference = window.matchMedia("(prefers-reduced-motion: reduce)");
       if (preference.matches) {
         pane.scrollTop = target;
@@ -166,8 +205,11 @@ export function Lyrics({
     if (!canSeek) return;
     try {
       const target = Math.max(0, at - offset);
-      await audio.seek(audio.state.durationMs === null
-        ? target : Math.min(target, audio.state.durationMs));
+      await audio.seek(
+        audio.state.durationMs === null
+          ? target
+          : Math.min(target, audio.state.durationMs),
+      );
       resync();
     } catch (reason) {
       audio.reportError(reason);
@@ -206,7 +248,11 @@ export function Lyrics({
       preferences: { ...preferences, ...patch },
       offset: trackOffset,
     }).then((saved) => {
-      if (token === generation.current && patch.external === true && saved?.preferences.external) {
+      if (
+        token === generation.current &&
+        patch.external === true &&
+        saved?.preferences.external
+      ) {
         void run({ kind: "search", query: null });
       }
     });
@@ -258,8 +304,19 @@ export function Lyrics({
       onWheel={() => setFollowing(false)}
       onTouchMove={() => setFollowing(false)}
       onKeyDown={(event) => {
-        if (["ArrowUp", "ArrowDown", "PageUp", "PageDown", "Home", "End", " "].includes(event.key)
-          && event.target === event.currentTarget) setFollowing(false);
+        if (
+          [
+            "ArrowUp",
+            "ArrowDown",
+            "PageUp",
+            "PageDown",
+            "Home",
+            "End",
+            " ",
+          ].includes(event.key) &&
+          event.target === event.currentTarget
+        )
+          setFollowing(false);
       }}
     >
       {candidate ? (
@@ -274,21 +331,23 @@ export function Lyrics({
               type="button"
               className="lyric-line-button"
               disabled={l.at === null || !canSeek}
-              onClick={() => { if (l.at !== null) void seekLine(l.at); }}
-              aria-label={l.at === null ? undefined : `Ir a ${Math.floor(Math.max(0, l.at - offset) / 1000)} segundos: ${l.text || "♪"}`}
+              onClick={() => {
+                if (l.at !== null) void seekLine(l.at);
+              }}
+              aria-label={
+                l.at === null
+                  ? undefined
+                  : `Ir a ${Math.floor(Math.max(0, l.at - offset) / 1000)} segundos: ${l.text || "♪"}`
+              }
             >
-            {preferences.mode === "karaoke" && l.words.length
-              ? l.words.map((w, j) => (
-                  <span
-                    className={
-                      j <= activeWord(l.words, position, offset) ? "sung" : ""
-                    }
-                    key={j}
-                  >
-                    {w.text}
-                  </span>
-                ))
-              : l.text || "♪"}
+              {preferences.mode === "karaoke" && l.words.length ? (
+                <LyricWords
+                  words={l.words}
+                  sung={activeWord(l.words, position, offset)}
+                />
+              ) : (
+                l.text || "♪"
+              )}
             </button>
           </p>
         ))
@@ -309,8 +368,12 @@ export function Lyrics({
   );
   const syncButton = candidate?.parsed.lines.some((l) => l.at !== null) && (
     <div className="lyrics-sync-controls">
-      <button type="button" className="button lyrics-resync" onClick={resync}
-        aria-pressed={following}>
+      <button
+        type="button"
+        className="button lyrics-resync"
+        onClick={resync}
+        aria-pressed={following}
+      >
         Volver a sincronizar
       </button>
     </div>
@@ -339,9 +402,12 @@ export function Lyrics({
         )}
         {track && syncButton}
         {(error || trackError) && <p role="alert">{error || trackError}</p>}
-        {loadedTrackId === trackId && snapshot.warnings.map((warning, index) => (
-          <p key={index} role="status">{warning}</p>
-        ))}
+        {loadedTrackId === trackId &&
+          snapshot.warnings.map((warning, index) => (
+            <p key={index} role="status">
+              {warning}
+            </p>
+          ))}
       </section>
     );
   return (

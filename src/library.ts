@@ -134,26 +134,28 @@ export function selectTracks(
   query: string,
 ): LibraryTrack[] {
   const needle = metadataKey(query);
-  let tracks = library.tracks.filter((t) =>
-    [
-      t.title,
-      t.artist,
-      t.album_artist,
-      t.album,
-      t.genre,
-      t.local_path,
-      t.year,
-      t.source,
-      t.source_id,
-      ...Object.values(t.metadata?.identifiers ?? {}).flatMap((value) =>
-        typeof value === "string"
-          ? [value]
-          : value && typeof value === "object"
-            ? Object.values(value)
-            : [],
-      ),
-    ].some((v) => metadataKey(String(v ?? "")).includes(needle)),
-  );
+  let tracks = needle
+    ? library.tracks.filter((t) =>
+        [
+          t.title,
+          t.artist,
+          t.album_artist,
+          t.album,
+          t.genre,
+          t.local_path,
+          t.year,
+          t.source,
+          t.source_id,
+          ...Object.values(t.metadata?.identifiers ?? {}).flatMap((value) =>
+            typeof value === "string"
+              ? [value]
+              : value && typeof value === "object"
+                ? Object.values(value)
+                : [],
+          ),
+        ].some((v) => metadataKey(String(v ?? "")).includes(needle)),
+      )
+    : [...library.tracks];
   if (view === "Favoritos") tracks = tracks.filter((t) => t.favorite);
   if (view === "Historial")
     tracks = tracks.filter((t) => t.last_played !== null || t.play_count > 0);

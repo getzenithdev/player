@@ -1,6 +1,7 @@
 import {
   useCallback,
   useEffect,
+  useMemo,
   useRef,
   useState,
   type CSSProperties,
@@ -89,10 +90,18 @@ export default function App() {
   const search = useRef<HTMLInputElement>(null);
   const audio = useAudioEngine();
   const { library, loading, error, reload } = useMusicLibrary();
-  const current = library.tracks.find(
-    (t) =>
-      t.id === audio.state.track?.trackId ||
-      t.local_path === audio.state.track?.path,
+  const current = useMemo(
+    () =>
+      library.tracks.find(
+        (t) =>
+          t.id === audio.state.track?.trackId ||
+          t.local_path === audio.state.track?.path,
+      ),
+    [library.tracks, audio.state.track?.trackId, audio.state.track?.path],
+  );
+  const favoriteCount = useMemo(
+    () => library.tracks.filter((track) => track.favorite).length,
+    [library.tracks],
   );
   function navigate(next: AppView) {
     if (window.matchMedia("(max-width: 900px)").matches) {
@@ -453,12 +462,9 @@ export default function App() {
                     <span className="sidebar-tooltip" aria-hidden="true">
                       {item.label}
                     </span>
-                    {item.view === "favorites" &&
-                      library.tracks.some((t) => t.favorite) && (
-                        <small>
-                          {library.tracks.filter((t) => t.favorite).length}
-                        </small>
-                      )}
+                    {item.view === "favorites" && favoriteCount > 0 && (
+                      <small>{favoriteCount}</small>
+                    )}
                   </button>
                 ))}
             </div>
