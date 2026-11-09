@@ -85,6 +85,7 @@ pub fn run() {
             artwork::artwork_action,
             artwork::artwork_data,
             artwork::artwork_frames,
+            artwork::artist_artwork,
             library_commands::library_artwork,
             playlist_commands::playlist_action,
             playlist_commands::history_snapshot,

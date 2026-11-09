@@ -18,7 +18,18 @@ export type AppView =
   | "genres"
   | "queue"
   | "lyrics"
-  | "artwork";
+  | "artwork"
+  | "albumDetail"
+  | "artistDetail";
+export interface CollectionRoute {
+  kind: "album" | "artist";
+  key: string;
+  title: string;
+}
+export interface LibraryLocation {
+  view: import("./library").LibraryView;
+  query: string;
+}
 export const viewTitle = (view: AppView) =>
   navigation.find((item) => item.view === view)?.label ??
   (
@@ -28,5 +39,7 @@ export const viewTitle = (view: AppView) =>
       queue: "Cola de reproducción",
       lyrics: "Letras",
       artwork: "Portada de la canción",
+      albumDetail: "Álbum",
+      artistDetail: "Artista",
     } as Record<string, string>
   )[view];

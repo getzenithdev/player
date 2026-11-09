@@ -1,8 +1,9 @@
 import { memo, useEffect, useRef, useState } from "react";
-import { invoke, isTauri } from "@tauri-apps/api/core";
+import { isTauri } from "@tauri-apps/api/core";
 import {
   discoverArtwork,
   loadArtwork,
+  loadArtworkFrames,
   subscribeArtwork,
   type LoadedArtwork,
 } from "./artworkClient";
@@ -21,6 +22,7 @@ export const TrackArtwork = memo(function TrackArtwork({
   paused = false,
   fallbackId,
   path,
+  quality,
 }: {
   trackId?: string | null;
   className?: string;
@@ -28,8 +30,15 @@ export const TrackArtwork = memo(function TrackArtwork({
   paused?: boolean;
   fallbackId?: string | null;
   path?: string | null;
+  quality?: "thumbnail" | "preview";
 }) {
-  const identity = JSON.stringify([trackId, path, fallbackId, animate]);
+  const identity = JSON.stringify([
+    trackId,
+    path,
+    fallbackId,
+    animate,
+    quality,
+  ]);
   const [loaded, setLoaded] = useState<{ key: string; value: LoadedArtwork }>();
   // Render only resources belonging to this song; an old response never flashes
   // the preceding song's cover while its replacement loads.
@@ -70,6 +79,29 @@ export const TrackArtwork = memo(function TrackArtwork({
   const currentFrames = frames?.key === gifKey ? frames : null;
 
   useEffect(() => {
+    setFailedPoster("");
+    setFrames(undefined);
+    setReady("");
+  }, [identity]);
+
+  useEffect(() => {
+    if (nearby && appVisible) return;
+    const timer = window.setTimeout(() => {
+      setLoaded(undefined);
+      setFrames(undefined);
+      setFailedPoster("");
+      setReady("");
+    }, 15_000);
+    return () => window.clearTimeout(timer);
+  }, [nearby, appVisible]);
+
+  useEffect(() => {
+    if (active) return;
+    const timer = window.setTimeout(() => setFrames(undefined), 15_000);
+    return () => window.clearTimeout(timer);
+  }, [active]);
+
+  useEffect(() => {
     const element = holder.current;
     if (!element) return;
     const stopNearby = observeNearbyArtwork(element, setNearby);
@@ -87,13 +119,19 @@ export const TrackArtwork = memo(function TrackArtwork({
   }, [animate]);
 
   useEffect(() => {
-    if (!nearby) return;
+    if (!nearby || !appVisible) return;
     let disposed = false;
     let version = 0;
     const reload = async () => {
       const request = ++version;
       try {
-        const value = await loadArtwork(trackId, path, fallbackId, animate);
+        const value = await loadArtwork(
+          trackId,
+          path,
+          fallbackId,
+          animate,
+          quality,
+        );
         if (!disposed && request === version)
           setLoaded({ key: identity, value });
       } catch (error) {
@@ -108,7 +146,16 @@ export const TrackArtwork = memo(function TrackArtwork({
       disposed = true;
       unsubscribe();
     };
-  }, [identity, trackId, path, fallbackId, animate, nearby]);
+  }, [
+    identity,
+    trackId,
+    path,
+    fallbackId,
+    animate,
+    quality,
+    nearby,
+    appVisible,
+  ]);
 
   useEffect(() => {
     if (!active || !resourceTrack) return;
@@ -163,9 +210,7 @@ export const TrackArtwork = memo(function TrackArtwork({
       return;
     if (frames?.key === gifKey && frames.items.length) return;
     let cancelled = false;
-    void invoke<{ url: string; delay: number }[]>("artwork_frames", {
-      id: asset.id,
-    })
+    void loadArtworkFrames(asset.id)
       .then((items) => {
         if (!cancelled) setFrames({ key: gifKey, items, index: 0 });
       })

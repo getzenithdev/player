@@ -2,13 +2,19 @@ import { invoke, isTauri } from "@tauri-apps/api/core";
 import { listen } from "@tauri-apps/api/event";
 import { artworkAction, emptyArtwork, type ArtworkSnapshot } from "./artwork";
 import { libraryAction } from "./library";
+import { ImageMemoryCache, scheduleImageRead } from "./imageMemory";
 
 export interface LoadedArtwork {
   trackId: string | null;
   snapshot: ArtworkSnapshot;
   poster: string;
 }
-const cache = new Map<string, { value: LoadedArtwork; expires: number }>();
+const cache = new ImageMemoryCache<LoadedArtwork>(
+  8 * 1024 * 1024,
+  24,
+  (value) =>
+    value.poster.length * 2 + value.snapshot.candidates.length * 1024 + 1024,
+);
 const pending = new Map<string, Promise<LoadedArtwork>>();
 const discoveries = new Map<string, Promise<ArtworkSnapshot>>();
 const listeners = new Set<() => void>();
@@ -45,16 +51,11 @@ export function loadArtwork(
   path: string | null | undefined,
   fallbackId: string | null | undefined,
   animate: boolean,
+  quality?: "thumbnail" | "preview",
 ): Promise<LoadedArtwork> {
-  const key = JSON.stringify([trackId, path, fallbackId, animate]);
+  const key = JSON.stringify([trackId, path, fallbackId, animate, quality]);
   const saved = cache.get(key);
-  if (saved && saved.expires > Date.now()) {
-    // Recently viewed artwork stays cached when a long list is scrolled back.
-    cache.delete(key);
-    cache.set(key, saved);
-    return Promise.resolve(saved.value);
-  }
-  if (saved) cache.delete(key);
+  if (saved) return Promise.resolve(saved);
   const existing = pending.get(key);
   if (existing) return existing;
   const version = revision;
@@ -74,7 +75,8 @@ export function loadArtwork(
       try {
         poster = await invoke<string>("artwork_data", {
           id: snapshot.resolved.id,
-          variant: animate ? snapshot.preferences.quality : "thumbnail",
+          variant:
+            quality ?? (animate ? snapshot.preferences.quality : "thumbnail"),
         });
       } catch {
         /* Keep the embedded/local cover if the selected resource is unavailable. */
@@ -84,14 +86,15 @@ export function loadArtwork(
       poster = await invoke<string>("library_artwork", { id: fallbackId });
     const value = { trackId: resolvedId || null, snapshot, poster };
     if (version === revision) {
-      if (cache.size >= 16) cache.delete(cache.keys().next().value!);
-      cache.set(key, { value, expires: Date.now() + 5 * 60_000 });
+      cache.set(key, value, 5 * 60_000);
     }
     return value;
   };
-  const request: Promise<LoadedArtwork> = task().finally(() => {
-    if (pending.get(key) === request) pending.delete(key);
-  });
+  const request: Promise<LoadedArtwork> = scheduleImageRead(task).finally(
+    () => {
+      if (pending.get(key) === request) pending.delete(key);
+    },
+  );
   pending.set(key, request);
   return request;
 }
@@ -111,5 +114,20 @@ export function discoverArtwork(
     if (discoveries.get(key) === request) discoveries.delete(key);
   });
   discoveries.set(key, request);
+  return request;
+}
+
+export interface ArtworkFrame {
+  url: string;
+  delay: number;
+}
+const pendingFrames = new Map<string, Promise<ArtworkFrame[]>>();
+export function loadArtworkFrames(id: string) {
+  const existing = pendingFrames.get(id);
+  if (existing) return existing;
+  const request = scheduleImageRead(() =>
+    invoke<ArtworkFrame[]>("artwork_frames", { id }),
+  ).finally(() => pendingFrames.delete(id));
+  pendingFrames.set(id, request);
   return request;
 }

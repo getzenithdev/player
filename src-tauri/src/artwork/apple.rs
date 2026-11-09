@@ -36,6 +36,49 @@ struct Shared<T> { state: Mutex<State<T>>, ready: Condvar }
 static ALBUMS: OnceLock<Shared<Album>> = OnceLock::new();
 static VIDEOS: OnceLock<Shared<Media>> = OnceLock::new();
 static POSTERS: OnceLock<Shared<Poster>> = OnceLock::new();
+#[derive(Clone)]
+struct ArtistPortrait { url: String }
+impl CacheValue for ArtistPortrait { fn ttl(&self) -> u64 { 24 * 3600 } }
+static ARTISTS: OnceLock<Shared<ArtistPortrait>> = OnceLock::new();
+
+/// Resolve the artist's own profile image, never an album-search thumbnail.
+pub(super) fn artist_portrait(name: &str, known_id: Option<&str>) -> Result<Option<Vec<u8>>, String> {
+    let name = clean_artist(name);
+    if name.is_empty() { return Ok(None); }
+    let known_id = known_id.filter(|id| !id.is_empty() && id.bytes().all(|byte| byte.is_ascii_digit()));
+    let key = serde_json::json!([name_key(&name), known_id]).to_string();
+    let portrait = cached(&ARTISTS, key, false, || {
+        let id = if let Some(id) = known_id {
+            id.to_string()
+        } else {
+            let mut url = reqwest::Url::parse("https://itunes.apple.com/search").map_err(|error| error.to_string())?;
+            url.query_pairs_mut().append_pair("term", &name).append_pair("entity", "musicArtist")
+                .append_pair("media", "music").append_pair("limit", "20");
+            let response: serde_json::Value = serde_json::from_slice(&resources::get(url, 1024 * 1024)?)
+                .map_err(|_| "Respuesta de artistas de Apple Music inválida")?;
+            let Some(rows) = response["results"].as_array() else { return Ok(None); };
+            let Some(id) = rows.iter()
+                .filter(|row| name_key(&field(row, "artistName")) == name_key(&name))
+                .find_map(|row| row["artistId"].as_u64()) else { return Ok(None); };
+            id.to_string()
+        };
+        let page = reqwest::Url::parse(&format!("https://music.apple.com/us/artist/{id}"))
+            .map_err(|error| error.to_string())?;
+        let html = page_text(page)?;
+        let Some(image) = meta(&html, "og:image").and_then(|image| media_url(&image, false)) else { return Ok(None); };
+        let mut url = reqwest::Url::parse(&image).map_err(|error| error.to_string())?;
+        if let Some((parent, file)) = url.path().rsplit_once('/')
+            && file.as_bytes().first().is_some_and(u8::is_ascii_digit) {
+            let path = format!("{parent}/960x960bb.jpg");
+            url.set_path(&path);
+        }
+        Ok(Some(ArtistPortrait { url: url.to_string() }))
+    })?;
+    portrait.map(|portrait| {
+        let url = reqwest::Url::parse(&portrait.url).map_err(|error| error.to_string())?;
+        resources::get(url, MAX_IMAGE)
+    }).transpose()
+}
 
 // Share actual in-flight results, rather than marking a request as completed
 // before the provider has answered. Errors expire much sooner than absence.

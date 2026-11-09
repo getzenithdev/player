@@ -62,6 +62,9 @@ struct Document {
     preferences: Preferences,
     apple_checked: BTreeMap<String, (String, u64)>,
     apple_warnings: BTreeMap<String, Vec<String>>,
+    artist_images: BTreeMap<String, String>,
+    artist_apple_images: BTreeMap<String, String>,
+    artist_apple_checked: BTreeMap<String, u64>,
 }
 #[derive(Serialize)]
 pub struct Snapshot {
@@ -138,6 +141,95 @@ fn bounded_file(path: &Path) -> Result<Vec<u8>, String> {
     }
     Ok(bytes)
 }
+
+/// Artist portraits are separate from album covers and survive application restarts.
+#[tauri::command]
+pub async fn artist_artwork(
+    app: tauri::AppHandle,
+    artist_key: String,
+    track_id: Option<String>,
+    path: Option<String>,
+    artist_name: Option<String>,
+) -> Result<Option<String>, String> {
+    use tauri::{Emitter, Manager};
+    tauri::async_runtime::spawn_blocking(move || {
+        if artist_key.trim().is_empty() || artist_key.len() > 4096
+            || artist_name.as_ref().is_some_and(|name| name.len() > 4096) {
+            return Err("Artista inválido".into());
+        }
+        let s = app.state::<StorageManager>();
+        let (saved, apple_saved, checked) = {
+            let _lock = s.library_lock();
+            let doc = load(&s)?;
+            (doc.artist_images.get(&artist_key).cloned(),
+             doc.artist_apple_images.get(&artist_key).cloned(),
+             doc.artist_apple_checked.get(&artist_key).copied().unwrap_or(0))
+        };
+        if path.is_none()
+            && let Some(id) = saved.as_ref().or(apple_saved.as_ref())
+            && let Ok(bytes) = bounded_file(&image_path(&s, id, "original")?) {
+            return Ok(Some(format!("data:image/png;base64,{}", STANDARD.encode(bytes))));
+        }
+        let track = if let Some(track_id) = track_id.as_ref() {
+            let _lock = s.library_lock();
+            library::load(&s)?.tracks.into_iter().find(|track| &track.id == track_id)
+        } else { None };
+        let source = if let Some(path) = path {
+            Some(std::path::PathBuf::from(path))
+        } else {
+            track.as_ref().and_then(|track| track.local_path.as_deref())
+                .and_then(|path| Path::new(path).parent())
+                .and_then(|directory| ["artist.jpg", "artist.png", "artist.webp"]
+                    .iter().map(|name| directory.join(name)).find(|path| path.is_file()))
+        };
+        let remote = source.is_none();
+        let bytes = if let Some(source) = source {
+            bounded_file(&source)?
+        } else {
+            let allowed = load_preferences(&s)?.external || crate::sources::external_enabled(&s);
+            if !allowed || checked > now() { return Ok(None); }
+            let name = artist_name.as_deref().filter(|name| !name.trim().is_empty())
+                .or_else(|| track.as_ref().and_then(|track| track.artist.as_deref()));
+            let Some(name) = name else { return Ok(None); };
+            let apple_id = track.as_ref()
+                .filter(|track| metadata::key(track.artist.as_deref().unwrap_or_default()) == metadata::key(name))
+                .and_then(|track| track.metadata.identifiers.provider_artist_ids.get("apple-music"))
+                .map(String::as_str);
+            let result = apple::artist_portrait(name, apple_id);
+            if !matches!(&result, Ok(Some(_))) {
+                let _lock = s.library_lock();
+                let mut doc = load(&s)?;
+                doc.artist_apple_checked.insert(artist_key.clone(), now() + if result.is_err() { 60 } else { 1800 });
+                s.save_document(DOCUMENT, &doc).map_err(|error| error.to_string())?;
+            }
+            match result { Ok(Some(bytes)) => bytes, Ok(None) => return Ok(None), Err(error) => return Err(error) }
+        };
+        let mut reader = ImageReader::new(Cursor::new(bytes))
+            .with_guessed_format().map_err(|error| error.to_string())?;
+        reader.limits(limits());
+        let photo = reader.decode().map_err(|_| "No se pudo leer la foto del artista")?
+            .thumbnail(960, 960);
+        let bytes = encode_png(&photo)?;
+        let id = format!("{:x}.png", Sha256::digest(&bytes));
+        {
+            let _lock = s.library_lock();
+            let mut doc = load(&s)?;
+            // A manual selection made during the network request always wins.
+            if remote && let Some(manual) = doc.artist_images.get(&artist_key)
+                && let Ok(bytes) = bounded_file(&image_path(&s, manual, "original")?) {
+                return Ok(Some(format!("data:image/png;base64,{}", STANDARD.encode(bytes))));
+            }
+            s.write_artwork_resource(&image_path(&s, &id, "original")?, &bytes)
+                .map_err(|error| error.to_string())?;
+            if remote { doc.artist_apple_images.insert(artist_key.clone(), id); }
+            else { doc.artist_images.insert(artist_key.clone(), id); }
+            s.save_document(DOCUMENT, &doc).map_err(|error| error.to_string())?;
+        }
+        let _ = app.emit("artist:changed", &artist_key);
+        Ok(Some(format!("data:image/png;base64,{}", STANDARD.encode(bytes))))
+    }).await.map_err(|error| error.to_string())?
+}
+
 fn limits() -> Limits {
     let mut limits = Limits::default();
     limits.max_image_width = Some(8192);
@@ -151,6 +243,11 @@ fn encode_png(image: &image::DynamicImage) -> Result<Vec<u8>, String> {
         .write_to(&mut out, ImageFormat::Png)
         .map_err(|e| e.to_string())?;
     Ok(out.into_inner())
+}
+fn square_cover(image: &image::DynamicImage, maximum: u32) -> image::DynamicImage {
+    let side = image.width().min(image.height());
+    image.crop_imm((image.width() - side) / 2, (image.height() - side) / 2, side, side)
+        .thumbnail(maximum, maximum)
 }
 fn valid_id(id: &str) -> bool {
     id.split_once('.').is_some_and(|(hash, ext)| {
@@ -227,8 +324,10 @@ fn store(
         false
     };
     let id = format!("{:x}.{ext}", Sha256::digest(bytes));
-    let thumb = encode_png(&decoded.thumbnail(256, 256))?;
-    let preview = encode_png(&decoded.thumbnail(1024, 1024))?;
+    let thumb = encode_png(&if m.provider == "youtube" { square_cover(&decoded, 256) }
+        else { decoded.thumbnail(256, 256) })?;
+    let preview = encode_png(&if m.provider == "youtube" { square_cover(&decoded, 1024) }
+        else { decoded.thumbnail(1024, 1024) })?;
     s.write_artwork_resource(&image_path(s, &id, "original")?, bytes)
         .map_err(|e| e.to_string())?;
     s.write_artwork_resource(&image_path(s, &id, "thumbnail")?, &thumb)
@@ -429,7 +528,33 @@ pub async fn artwork_data(
     use tauri::Manager;
     tauri::async_runtime::spawn_blocking(move || {
         let s = app.state::<StorageManager>();
-        let bytes = bounded_file(&image_path(&s, &id, &variant)?)?;
+        let target = image_path(&s, &id, &variant)?;
+        let mut bytes = bounded_file(&target)?;
+        // Upgrade older rectangular YouTube previews only when first used.
+        // Originals stay untouched for export and future recropping.
+        if variant != "original" {
+            let rectangular = ImageReader::new(Cursor::new(bytes.as_slice()))
+                .with_guessed_format().ok()
+                .and_then(|reader| reader.into_dimensions().ok())
+                .is_some_and(|(width, height)| width != height);
+            if rectangular {
+                let youtube = {
+                    let _lock = s.library_lock();
+                    load(&s)?.tracks.values().flatten()
+                        .any(|asset| asset.id == id && asset.provider == "youtube")
+                };
+                if youtube {
+                    let original = bounded_file(&image_path(&s, &id, "original")?)?;
+                    let mut reader = ImageReader::new(Cursor::new(original))
+                        .with_guessed_format().map_err(|error| error.to_string())?;
+                    reader.limits(limits());
+                    let image = reader.decode().map_err(|error| error.to_string())?;
+                    bytes = encode_png(&square_cover(&image, if variant == "thumbnail" { 256 } else { 1024 }))?;
+                    // A read-only library can still display the cropped image.
+                    let _ = s.write_artwork_resource(&target, &bytes);
+                }
+            }
+        }
         let mime = if variant != "original" {
             "png"
         } else {

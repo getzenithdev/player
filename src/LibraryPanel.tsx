@@ -1,4 +1,11 @@
-import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import {
+  useCallback,
+  useEffect,
+  useLayoutEffect,
+  useMemo,
+  useRef,
+  useState,
+} from "react";
 import { isTauri } from "@tauri-apps/api/core";
 import { listen } from "@tauri-apps/api/event";
 import { open } from "@tauri-apps/plugin-dialog";
@@ -7,6 +14,7 @@ import {
   emptyLibrary,
   groupKey,
   groupIdentity,
+  metadataKey,
   libraryAction,
   libraryViews,
   selectTracks,
@@ -20,21 +28,52 @@ import { TrackArtwork } from "./TrackArtwork";
 import { Icon } from "./Icon";
 import { entryFromTrack, usePlaylists } from "./playlists";
 import "./Playlists.css";
+import { ArtistArtwork } from "./ArtistArtwork";
+import { CollectionDetail } from "./CollectionDetail";
+import { albumGroups } from "./musicViews";
+import type { CollectionRoute, LibraryLocation } from "./navigation";
 
 export function Library({
   audio,
   initialView = "Canciones",
   initialQuery = "",
+  collection,
+  onOpenCollection,
+  onBack,
+  onReady,
+  backgroundTarget,
 }: {
   audio: AudioController;
   initialView?: LibraryView;
   initialQuery?: string;
+  collection?: CollectionRoute;
+  onOpenCollection?: (
+    collection: CollectionRoute,
+    location?: LibraryLocation,
+  ) => void;
+  onBack?: () => void;
+  onReady?: () => void;
+  backgroundTarget?: HTMLElement | null;
 }) {
   const lists = usePlaylists();
   const [library, setLibrary] = useState(emptyLibrary);
-  const [view, setView] = useState<LibraryView>(initialView);
+  useLayoutEffect(() => {
+    if (library !== emptyLibrary) onReady?.();
+  }, [library, onReady]);
+  const [view, setView] = useState<LibraryView>(
+    collection
+      ? collection.kind === "album"
+        ? "Álbumes"
+        : "Artistas"
+      : initialView,
+  );
   const [query, setQuery] = useState(initialQuery);
-  const [selectedGroup, setSelectedGroup] = useState<string | null>(null);
+  const [selectedGroup, setSelectedGroup] = useState<string | null>(
+    collection?.key ?? null,
+  );
+  const [selectedArtistAlbum, setSelectedArtistAlbum] = useState<string | null>(
+    null,
+  );
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [editing, setEditing] = useState<LibraryTrack | null>(null);
@@ -134,12 +173,111 @@ export function Library({
     }
     return result;
   }, [tracks, view]);
+  const albums = useMemo(
+    () =>
+      albumGroups(library.tracks).map((items) =>
+        items.sort(
+          (a, b) =>
+            (a.disc_number ?? 0) - (b.disc_number ?? 0) ||
+            (a.track_number ?? 0) - (b.track_number ?? 0) ||
+            a.title.localeCompare(b.title),
+        ),
+      ),
+    [library.tracks],
+  );
+  const selectedArtist = useMemo(() => {
+    if (view !== "Artistas" || selectedGroup === null) return undefined;
+    const exact = library.tracks.find(
+      (track) => groupIdentity(track, "Artistas") === selectedGroup,
+    );
+    if (exact) return exact;
+    const albumArtist = library.tracks.find(
+      (track) =>
+        track.album_artist && metadataKey(track.album_artist) === selectedGroup,
+    );
+    return albumArtist
+      ? {
+          ...albumArtist,
+          artist: albumArtist.album_artist,
+          metadata: undefined,
+        }
+      : undefined;
+  }, [library.tracks, view, selectedGroup]);
+  const artistAlbums = useMemo(() => {
+    if (!selectedArtist) return [];
+    const name = metadataKey(selectedArtist.artist ?? "");
+    return albums
+      .filter((items) =>
+        items.some(
+          (track) =>
+            groupIdentity(track, "Artistas") === selectedGroup ||
+            (name &&
+              metadataKey(track.album_artist ?? "") === name &&
+              metadataKey(track.artist ?? "") !== name),
+        ),
+      )
+      .sort((a, b) => (b[0].year ?? 0) - (a[0].year ?? 0));
+  }, [albums, selectedArtist, selectedGroup]);
+  const detailTracks = useMemo(() => {
+    if (selectedGroup === null) return [];
+    if (view === "Álbumes")
+      return (
+        albums.find(
+          (items) => groupIdentity(items[0], "Álbumes") === selectedGroup,
+        ) ?? []
+      );
+    if (view === "Artistas") {
+      if (selectedArtistAlbum)
+        return (
+          artistAlbums.find(
+            (items) =>
+              groupIdentity(items[0], "Álbumes") === selectedArtistAlbum,
+          ) ?? []
+        );
+      return library.tracks.filter(
+        (track) =>
+          groupIdentity(track, "Artistas") === selectedGroup ||
+          (!!selectedArtist?.artist &&
+            metadataKey(track.album_artist ?? "") ===
+              metadataKey(selectedArtist.artist) &&
+            metadataKey(track.artist ?? "") !==
+              metadataKey(selectedArtist.artist)),
+      );
+    }
+    return [];
+  }, [
+    selectedGroup,
+    selectedArtistAlbum,
+    view,
+    albums,
+    artistAlbums,
+    library.tracks,
+    selectedArtist,
+  ]);
+  const detailArtist = useMemo(() => {
+    const first = detailTracks[0];
+    if (!first) return undefined;
+    if (view === "Artistas" && !selectedArtistAlbum) return selectedArtist;
+    const name = first.album_artist ?? first.artist;
+    return (
+      library.tracks.find(
+        (track) => metadataKey(track.artist ?? "") === metadataKey(name ?? ""),
+      ) ?? { ...first, artist: name, metadata: undefined }
+    );
+  }, [detailTracks, library.tracks, selectedArtist, selectedArtistAlbum, view]);
+  const visibleGroups = detailTracks.length
+    ? [[selectedGroup!, detailTracks] as const]
+    : [...groups].filter(
+        ([key]) => selectedGroup === null || selectedGroup === key,
+      );
   function play(selected: LibraryTrack) {
-    const playable = tracks.filter(
+    const playable = (detailTracks.length ? detailTracks : tracks).filter(
       (t) =>
         !t.missing &&
         t.local_path &&
-        (selectedGroup === null || groupIdentity(t, view) === selectedGroup),
+        (detailTracks.length > 0 ||
+          selectedGroup === null ||
+          groupIdentity(t, view) === selectedGroup),
     );
     const index = playable.findIndex((t) => t.id === selected.id);
     if (index < 0) return;
@@ -151,183 +289,319 @@ export function Library({
     );
   }
   return (
-    <div className="music-library" aria-busy={busy}>
-      <div className="toolbar">
-        <label className="search-field">
-          <span className="sr-only">Buscar en la biblioteca</span>
-          <input
-            type="search"
-            placeholder="Buscar canciones, artistas o álbumes"
-            value={query}
-            onChange={(e) => {
-              setQuery(e.target.value);
-              setSelectedGroup(null);
+    <div
+      className={`music-library${collection ? " collection-page" : ""}`}
+      aria-busy={busy}
+    >
+      {!collection && (
+        <>
+          <div className="toolbar">
+            <label className="search-field">
+              <span className="sr-only">Buscar en la biblioteca</span>
+              <input
+                type="search"
+                placeholder="Buscar canciones, artistas o álbumes"
+                value={query}
+                onChange={(e) => {
+                  setQuery(e.target.value);
+                  setSelectedGroup(null);
+                  setSelectedArtistAlbum(null);
+                }}
+              />
+            </label>
+            <button disabled={!native || busy} onClick={() => void add(false)}>
+              Agregar archivos
+            </button>
+            <button disabled={!native || busy} onClick={() => void add(true)}>
+              Agregar carpetas
+            </button>
+            <details className="library-tools advanced-details">
+              <summary>Organizar biblioteca</summary>
+              <div className="resource-actions">
+                <button
+                  disabled={!native || busy}
+                  onClick={() =>
+                    void (async () => {
+                      setBusy(true);
+                      setError(null);
+                      try {
+                        const path = await open({
+                          title: "Importar metadatos de biblioteca",
+                          multiple: false,
+                          directory: false,
+                          filters: [
+                            { name: "Metadatos Zenith", extensions: ["json"] },
+                          ],
+                        });
+                        if (typeof path === "string")
+                          await run({ kind: "importMetadata", path });
+                      } catch (reason) {
+                        setError(String(reason));
+                      } finally {
+                        setBusy(false);
+                      }
+                    })()
+                  }
+                >
+                  Importar metadatos JSON
+                </button>
+                <button
+                  disabled={!native || busy || !library.locations.length}
+                  onClick={() => void run({ kind: "rescan" })}
+                >
+                  Volver a explorar
+                </button>
+              </div>
+            </details>
+          </div>
+          {!native && (
+            <p className="module-note">
+              Importa música desde la aplicación de escritorio.
+            </p>
+          )}
+          {busy && <p role="status">Procesando biblioteca…</p>}
+          {(error || lists.error) && (
+            <p role="alert" className="library-error">
+              {error || lists.error}
+            </p>
+          )}
+          {!!warnings.length && (
+            <details className="library-warnings">
+              <summary>{warnings.length} avisos de lectura</summary>
+              <ul>
+                {warnings.map((w, i) => (
+                  <li key={i}>{w}</li>
+                ))}
+              </ul>
+            </details>
+          )}
+          {library.metadata_analysis &&
+            (library.metadata_analysis.album_candidates.length > 0 ||
+              library.metadata_analysis.artist_collisions.length > 0) && (
+              <details className="library-warnings">
+                <summary>Coincidencias e identidades para revisar</summary>
+                <p>
+                  Las entradas se conservan separadas. Una coincidencia de
+                  nombre no confirma que sea la misma edición o el mismo
+                  artista.
+                </p>
+                <ul>
+                  {library.metadata_analysis.album_candidates.map((a, i) => (
+                    <li key={"album-" + i}>
+                      {a.name}: {a.album_keys.length} grupos de edición o
+                      identidad.
+                    </li>
+                  ))}
+                  {library.metadata_analysis.artist_collisions.map((a, i) => (
+                    <li key={"artist-" + i}>
+                      {a.name}: {a.identities.length} identidades de artista.
+                    </li>
+                  ))}
+                </ul>
+              </details>
+            )}
+          <div className="library-viewbar">
+            <label>
+              <span className="sr-only">Vista de biblioteca</span>
+              <select
+                aria-label="Vista de biblioteca"
+                value={view}
+                onChange={(event) => {
+                  setView(event.target.value as LibraryView);
+                  setSelectedGroup(null);
+                  setSelectedArtistAlbum(null);
+                }}
+              >
+                {libraryViews.map((tab) => (
+                  <option key={tab} value={tab}>
+                    {tab}
+                  </option>
+                ))}
+              </select>
+            </label>
+            <span>
+              {tracks.length} {tracks.length === 1 ? "canción" : "canciones"}
+            </span>
+          </div>
+          {view === "Duplicados" && (
+            <p>
+              Las coincidencias por SHA-256 se confirman por contenido completo.
+              Las coincidencias por tamaño y metadatos son posibles duplicados.
+              No se fusionan ni eliminan archivos.
+            </p>
+          )}
+          {!tracks.length && (
+            <div className="library-empty">
+              <h2>{query ? "Sin resultados" : "Biblioteca vacía"}</h2>
+              <p>
+                {query
+                  ? "Prueba otra búsqueda o vista."
+                  : "Agrega archivos o una carpeta."}
+              </p>
+            </div>
+          )}
+        </>
+      )}
+      {(collection || selectedGroup !== null) && (
+        <button
+          className="text-button collection-back"
+          onClick={() => {
+            if (collection) {
+              onBack?.();
+              return;
+            }
+            if (selectedArtistAlbum) setSelectedArtistAlbum(null);
+            else setSelectedGroup(null);
+          }}
+        >
+          <span aria-hidden="true">←</span>{" "}
+          {collection
+            ? "Volver"
+            : selectedArtistAlbum
+              ? `Volver a ${selectedArtist?.artist ?? "artista"}`
+              : `Volver a ${view.toLocaleLowerCase()}`}
+        </button>
+      )}
+      <div
+        className={
+          detailTracks.length > 0 ? "collection-presentation" : undefined
+        }
+      >
+        {detailTracks.length > 0 && detailArtist && (
+          <CollectionDetail
+            backgroundTarget={backgroundTarget}
+            key={`${view}-${selectedGroup}-${selectedArtistAlbum ?? ""}`}
+            kind={
+              view === "Artistas" && !selectedArtistAlbum ? "artist" : "album"
+            }
+            tracks={detailTracks}
+            artist={detailArtist}
+            onArtist={() => {
+              if (onOpenCollection) {
+                onOpenCollection({
+                  kind: "artist",
+                  key: groupIdentity(detailArtist, "Artistas"),
+                  title: detailArtist.artist ?? "Artista desconocido",
+                });
+                return;
+              }
+              setView("Artistas");
+              setQuery("");
+              setSelectedGroup(groupIdentity(detailArtist, "Artistas"));
+              setSelectedArtistAlbum(null);
+            }}
+            onPlay={() => {
+              const first = detailTracks.find(
+                (track) => track.local_path && !track.missing,
+              );
+              if (first) play(first);
             }}
           />
-        </label>
-        <button disabled={!native || busy} onClick={() => void add(false)}>
-          Agregar archivos
-        </button>
-        <button disabled={!native || busy} onClick={() => void add(true)}>
-          Agregar carpetas
-        </button>
-        <details className="library-tools advanced-details">
-          <summary>Organizar biblioteca</summary>
-          <div className="resource-actions">
-            <button
-              disabled={!native || busy}
-              onClick={() =>
-                void (async () => {
-                  setBusy(true);
-                  setError(null);
-                  try {
-                    const path = await open({
-                      title: "Importar metadatos de biblioteca",
-                      multiple: false,
-                      directory: false,
-                      filters: [
-                        { name: "Metadatos Zenith", extensions: ["json"] },
-                      ],
-                    });
-                    if (typeof path === "string")
-                      await run({ kind: "importMetadata", path });
-                  } catch (reason) {
-                    setError(String(reason));
-                  } finally {
-                    setBusy(false);
-                  }
-                })()
-              }
-            >
-              Importar metadatos JSON
-            </button>
-            <button
-              disabled={!native || busy || !library.locations.length}
-              onClick={() => void run({ kind: "rescan" })}
-            >
-              Volver a explorar
-            </button>
-          </div>
-        </details>
-      </div>
-      {!native && (
-        <p className="module-note">
-          Importa música desde la aplicación de escritorio.
-        </p>
-      )}
-      {busy && <p role="status">Procesando biblioteca…</p>}
-      {(error || lists.error) && (
-        <p role="alert" className="library-error">
-          {error || lists.error}
-        </p>
-      )}
-      {!!warnings.length && (
-        <details className="library-warnings">
-          <summary>{warnings.length} avisos de lectura</summary>
-          <ul>
-            {warnings.map((w, i) => (
-              <li key={i}>{w}</li>
-            ))}
-          </ul>
-        </details>
-      )}
-      {library.metadata_analysis &&
-        (library.metadata_analysis.album_candidates.length > 0 ||
-          library.metadata_analysis.artist_collisions.length > 0) && (
-          <details className="library-warnings">
-            <summary>Coincidencias e identidades para revisar</summary>
-            <p>
-              Las entradas se conservan separadas. Una coincidencia de nombre no
-              confirma que sea la misma edición o el mismo artista.
-            </p>
-            <ul>
-              {library.metadata_analysis.album_candidates.map((a, i) => (
-                <li key={"album-" + i}>
-                  {a.name}: {a.album_keys.length} grupos de edición o identidad.
-                </li>
-              ))}
-              {library.metadata_analysis.artist_collisions.map((a, i) => (
-                <li key={"artist-" + i}>
-                  {a.name}: {a.identities.length} identidades de artista.
-                </li>
-              ))}
-            </ul>
-          </details>
         )}
-      <div className="library-viewbar">
-        <label>
-          <span className="sr-only">Vista de biblioteca</span>
-          <select
-            aria-label="Vista de biblioteca"
-            value={view}
-            onChange={(event) => {
-              setView(event.target.value as LibraryView);
-              setSelectedGroup(null);
-            }}
+        {selectedArtist && !selectedArtistAlbum && artistAlbums.length > 0 && (
+          <section
+            className="artist-discography"
+            aria-label={`Álbumes de ${selectedArtist.artist ?? "artista"}`}
           >
-            {libraryViews.map((tab) => (
-              <option key={tab} value={tab}>
-                {tab}
-              </option>
+            <div className="section-heading">
+              <h2>Álbumes</h2>
+              <span className="collection-subtitle">{artistAlbums.length}</span>
+            </div>
+            <div className="library-gallery">
+              {artistAlbums.map((items) => (
+                <button
+                  className="collection-card"
+                  key={groupIdentity(items[0], "Álbumes")}
+                  onClick={() => {
+                    if (onOpenCollection)
+                      onOpenCollection({
+                        kind: "album",
+                        key: groupIdentity(items[0], "Álbumes"),
+                        title: items[0].album ?? "Sin álbum",
+                      });
+                    else
+                      setSelectedArtistAlbum(
+                        groupIdentity(items[0], "Álbumes"),
+                      );
+                  }}
+                >
+                  <TrackArtwork
+                    className="collection-art"
+                    trackId={items[0].id}
+                    fallbackId={items[0].artwork_id}
+                  />
+                  <strong>{items[0].album ?? "Sin álbum"}</strong>
+                  <span>
+                    {[items[0].year, `${items.length} canciones`]
+                      .filter(Boolean)
+                      .join(" · ")}
+                  </span>
+                </button>
+              ))}
+            </div>
+          </section>
+        )}
+        {selectedGroup === null &&
+        ["Álbumes", "Artistas", "Géneros"].includes(view) ? (
+          <div
+            className={`library-gallery ${view === "Artistas" ? "artist-gallery" : ""}`}
+          >
+            {[...groups].map(([key, items]) => (
+              <button
+                className="collection-card"
+                key={key}
+                onClick={() => {
+                  if (
+                    onOpenCollection &&
+                    (view === "Álbumes" || view === "Artistas")
+                  ) {
+                    onOpenCollection(
+                      {
+                        kind: view === "Álbumes" ? "album" : "artist",
+                        key,
+                        title:
+                          view === "Álbumes"
+                            ? (items[0].album ?? "Sin álbum")
+                            : (items[0].artist ?? "Artista desconocido"),
+                      },
+                      { view, query },
+                    );
+                    return;
+                  }
+                  setSelectedGroup(key);
+                  setSelectedArtistAlbum(null);
+                }}
+              >
+                {view === "Artistas" ? (
+                  <ArtistArtwork
+                    className="collection-art"
+                    artistKey={key}
+                    name={items[0].artist ?? "Artista desconocido"}
+                    trackId={items[0].id}
+                  />
+                ) : (
+                  <TrackArtwork
+                    className="collection-art"
+                    trackId={items[0].id}
+                    fallbackId={items[0].artwork_id}
+                  />
+                )}
+                <strong>{groupKey(items[0], view)}</strong>
+                <span>
+                  {items.length} {items.length === 1 ? "canción" : "canciones"}
+                </span>
+              </button>
             ))}
-          </select>
-        </label>
-        <span>
-          {tracks.length} {tracks.length === 1 ? "canción" : "canciones"}
-        </span>
-      </div>
-      {view === "Duplicados" && (
-        <p>
-          Las coincidencias por SHA-256 se confirman por contenido completo. Las
-          coincidencias por tamaño y metadatos son posibles duplicados. No se
-          fusionan ni eliminan archivos.
-        </p>
-      )}
-      {!tracks.length && (
-        <div className="library-empty">
-          <h2>{query ? "Sin resultados" : "Biblioteca vacía"}</h2>
-          <p>
-            {query
-              ? "Prueba otra búsqueda o vista."
-              : "Agrega archivos o una carpeta."}
-          </p>
-        </div>
-      )}
-      {selectedGroup !== null && (
-        <button className="text-button" onClick={() => setSelectedGroup(null)}>
-          Volver a {view.toLocaleLowerCase()}
-        </button>
-      )}
-      {selectedGroup === null &&
-      ["Álbumes", "Artistas", "Géneros"].includes(view) ? (
-        <div
-          className={`library-gallery ${view === "Artistas" ? "artist-gallery" : ""}`}
-        >
-          {[...groups].map(([key, items]) => (
-            <button
-              className="collection-card"
-              key={key}
-              onClick={() => setSelectedGroup(key)}
-            >
-              <TrackArtwork
-                className="collection-art"
-                trackId={items[0].id}
-                fallbackId={items[0].artwork_id}
-              />
-              <strong>{groupKey(items[0], view)}</strong>
-              <span>
-                {items.length} {items.length === 1 ? "canción" : "canciones"}
-              </span>
-            </button>
-          ))}
-        </div>
-      ) : (
-        [...groups]
-          .filter(([key]) => selectedGroup === null || selectedGroup === key)
-          .map(([key, items]) => (
+          </div>
+        ) : (
+          visibleGroups.map(([key, items]) => (
             <section key={key} aria-label={groupKey(items[0], view) || view}>
-              {groupKey(items[0], view) && (
-                <h2 className="library-group">{groupKey(items[0], view)}</h2>
+              {(detailTracks.length > 0 || groupKey(items[0], view)) && (
+                <h2 className="library-group">
+                  {detailTracks.length > 0
+                    ? "Canciones"
+                    : groupKey(items[0], view)}
+                </h2>
               )}
               <div className="library-tracks">
                 {items.map((t) => (
@@ -453,26 +727,41 @@ export function Library({
               </div>
             </section>
           ))
-      )}
-      <details className="library-locations">
-        <summary>Ubicaciones ({library.locations.length})</summary>
-        <p>
-          Se revisan cada 10 segundos mientras la aplicación está abierta.
-          Quitar una ubicación solo retira las pistas que no cubra otra
-          ubicación.
+        )}
+      </div>
+      {collection && (error || lists.error) && (
+        <p className="library-error" role="alert">
+          {error || lists.error}
         </p>
-        {library.locations.map((path) => (
-          <div key={path}>
-            <code>{path}</code>
-            <button
-              disabled={busy}
-              onClick={() => void run({ kind: "removeLocation", path })}
-            >
-              Quitar ubicación
-            </button>
-          </div>
-        ))}
-      </details>
+      )}
+      {collection && !detailTracks.length && !error && (
+        <p className="inline-note" role="status">
+          {library !== emptyLibrary
+            ? "Esta colección ya no está en tu biblioteca."
+            : "Cargando colección…"}
+        </p>
+      )}
+      {!collection && (
+        <details className="library-locations">
+          <summary>Ubicaciones ({library.locations.length})</summary>
+          <p>
+            Se revisan cada 10 segundos mientras la aplicación está abierta.
+            Quitar una ubicación solo retira las pistas que no cubra otra
+            ubicación.
+          </p>
+          {library.locations.map((path) => (
+            <div key={path}>
+              <code>{path}</code>
+              <button
+                disabled={busy}
+                onClick={() => void run({ kind: "removeLocation", path })}
+              >
+                Quitar ubicación
+              </button>
+            </div>
+          ))}
+        </details>
+      )}
       {editing && (
         <MetadataEditor
           key={editing.id}

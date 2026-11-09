@@ -361,7 +361,9 @@ export function Search({
                 {albums.map((items) => (
                   <button
                     key={items[0].id}
-                    onClick={() => onAlbum(items[0].album ?? "", "albums")}
+                    onClick={() =>
+                      onAlbum(groupIdentity(items[0], "Álbumes"), "albums")
+                    }
                   >
                     <TrackArtwork
                       className="library-cover"
@@ -383,7 +385,9 @@ export function Search({
                 {artists.map((artist) => (
                   <button
                     key={groupIdentity(artist, "Artistas")}
-                    onClick={() => onAlbum(artist.artist ?? "", "artists")}
+                    onClick={() =>
+                      onAlbum(groupIdentity(artist, "Artistas"), "artists")
+                    }
                   >
                     <Icon name="artists" />
                     <strong>{groupKey(artist, "Artistas")}</strong>

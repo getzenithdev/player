@@ -1,6 +1,7 @@
 import {
   useCallback,
   useEffect,
+  useLayoutEffect,
   useMemo,
   useRef,
   useState,
@@ -9,7 +10,13 @@ import {
 import { pickAudioFiles, useAudioEngine } from "./audio";
 import { accessibilityAttributes, playbackAnnouncement } from "./accessibility";
 import { Icon } from "./Icon";
-import { navigation, viewTitle, type AppView } from "./navigation";
+import {
+  navigation,
+  viewTitle,
+  type AppView,
+  type CollectionRoute,
+  type LibraryLocation,
+} from "./navigation";
 import { hasNativeStorage, loadAppearance, saveAppearance } from "./storage";
 import {
   defaultIntegrationSettings,
@@ -35,7 +42,7 @@ import { PlayerBar } from "./PlayerBar";
 import { ExpandedPlayer } from "./ExpandedPlayer";
 import { checkForUpdate } from "./updater";
 import { useMusicLibrary } from "./useMusicLibrary";
-import { libraryAction, type LibraryView } from "./library";
+import { groupIdentity, libraryAction, type LibraryView } from "./library";
 import "./App.css";
 import "./Experience.css";
 import "./Refinement.css";
@@ -48,9 +55,27 @@ const libraryRoutes: Partial<Record<AppView, LibraryView>> = {
   genres: "Géneros",
   favorites: "Favoritos",
 };
+type CollectionVisit = {
+  collection: CollectionRoute;
+  origin: {
+    view: AppView;
+    query: string;
+    libraryView?: LibraryView;
+    scroll: number;
+  };
+};
 
 export default function App() {
   const [view, setView] = useState<AppView>("home");
+  const [collectionHistory, setCollectionHistory] = useState<CollectionVisit[]>(
+    [],
+  );
+  const [restoredLibraryView, setRestoredLibraryView] = useState<LibraryView>();
+  const activeCollection = collectionHistory.at(-1)?.collection;
+  const isCollectionPage = view === "albumDetail" || view === "artistDetail";
+  const [collectionBackground, setCollectionBackground] =
+    useState<HTMLDivElement | null>(null);
+  const pendingScroll = useRef<number | null>(null);
   const [playerExpanded, setPlayerExpanded] = useState(false);
   const [sidebarCollapsed, setSidebarCollapsed] = useState(() => {
     try {
@@ -76,6 +101,8 @@ export default function App() {
   const [theme, setTheme] = useState("violet");
   const [query, setQuery] = useState("");
   const [libraryQuery, setLibraryQuery] = useState("");
+  const pageKey = `${view}-${libraryQuery}-${activeCollection?.kind ?? ""}-${activeCollection?.key ?? ""}`;
+  const pageTitle = activeCollection?.title ?? viewTitle(view);
   const [picking, setPicking] = useState(false);
   const [themeError, setThemeError] = useState("");
   const [integrationError, setIntegrationError] = useState("");
@@ -112,14 +139,65 @@ export default function App() {
       return;
     }
     setPlayerExpanded(false);
+    pendingScroll.current = null;
+    setCollectionHistory([]);
+    setRestoredLibraryView(undefined);
     setView(next);
     setLibraryQuery("");
     main.current?.scrollTo({ top: 0 });
     main.current?.focus({ preventScroll: true });
   }
+  function openCollection(
+    collection: CollectionRoute,
+    location?: LibraryLocation,
+  ) {
+    if (
+      activeCollection?.kind === collection.kind &&
+      activeCollection.key === collection.key
+    )
+      return;
+    setCollectionHistory((history) => [
+      ...history,
+      {
+        collection,
+        origin: {
+          view,
+          query: location?.query ?? libraryQuery,
+          libraryView: location?.view ?? restoredLibraryView,
+          scroll: main.current?.scrollTop ?? 0,
+        },
+      },
+    ]);
+    setPlayerExpanded(false);
+    setView(collection.kind === "album" ? "albumDetail" : "artistDetail");
+    pendingScroll.current = 0;
+  }
+  function backFromCollection() {
+    const visit = collectionHistory.at(-1);
+    if (!visit) return;
+    setCollectionHistory((history) => history.slice(0, -1));
+    setView(visit.origin.view);
+    setLibraryQuery(visit.origin.query);
+    setRestoredLibraryView(visit.origin.libraryView);
+    pendingScroll.current = visit.origin.scroll;
+  }
+  const restorePagePosition = useCallback(() => {
+    if (pendingScroll.current === null) return;
+    main.current?.scrollTo({ top: pendingScroll.current });
+    main.current?.focus({ preventScroll: true });
+    pendingScroll.current = null;
+  }, []);
+  useLayoutEffect(() => {
+    const waitingForLibrary =
+      !!libraryRoutes[view] ||
+      view === "albumDetail" ||
+      view === "artistDetail";
+    if (pendingScroll.current === 0 || !waitingForLibrary)
+      restorePagePosition();
+  }, [pageKey, view, restorePagePosition]);
   useEffect(() => {
-    document.title = `${viewTitle(view)} · Zenith Player`;
-  }, [view]);
+    document.title = `${pageTitle} · Zenith Player`;
+  }, [pageTitle]);
   useEffect(() => {
     let disposed = false;
     void loadAppearance()
@@ -295,12 +373,29 @@ export default function App() {
   }
   function content() {
     const shared = { audio, tracks: library.tracks, navigate };
+    if (
+      (view === "albumDetail" || view === "artistDetail") &&
+      activeCollection
+    ) {
+      return (
+        <Library
+          collection={activeCollection}
+          audio={audio}
+          onOpenCollection={openCollection}
+          onBack={backFromCollection}
+          onReady={restorePagePosition}
+          backgroundTarget={collectionBackground}
+        />
+      );
+    }
     if (libraryRoutes[view])
       return (
         <Library
           audio={audio}
-          initialView={libraryRoutes[view]}
+          initialView={restoredLibraryView ?? libraryRoutes[view]}
           initialQuery={libraryQuery}
+          onOpenCollection={openCollection}
+          onReady={restorePagePosition}
         />
       );
     switch (view) {
@@ -312,9 +407,24 @@ export default function App() {
             {...shared}
             query={query}
             onQuery={setQuery}
-            onAlbum={(text, next) => {
-              setLibraryQuery(text);
-              setView(next);
+            onAlbum={(key, next) => {
+              const kind = next === "artists" ? "artist" : "album";
+              const track = library.tracks.find(
+                (track) =>
+                  groupIdentity(
+                    track,
+                    kind === "album" ? "Álbumes" : "Artistas",
+                  ) === key,
+              );
+              if (track)
+                openCollection({
+                  kind,
+                  key,
+                  title:
+                    kind === "album"
+                      ? (track.album ?? "Sin álbum")
+                      : (track.artist ?? "Artista desconocido"),
+                });
             }}
           />
         );
@@ -471,7 +581,19 @@ export default function App() {
           ))}
         </nav>
       </aside>
-      <main ref={main} id="main-content" tabIndex={-1}>
+      <main
+        ref={main}
+        id="main-content"
+        tabIndex={-1}
+        className={isCollectionPage ? "collection-view" : undefined}
+      >
+        {isCollectionPage && (
+          <div
+            ref={setCollectionBackground}
+            className="collection-page-background"
+            aria-hidden="true"
+          />
+        )}
         <header className="page-header">
           <button
             className="sidebar-mobile-toggle icon-button"
@@ -483,7 +605,7 @@ export default function App() {
             <Icon name="sidebarExpand" />
           </button>
           <div className="page-heading">
-            <h1>{viewTitle(view)}</h1>
+            <h1>{pageTitle}</h1>
           </div>
           <form
             className="global-search"
@@ -514,7 +636,7 @@ export default function App() {
             <Icon name="plus" />
           </button>
         </header>
-        <div className="page-content" key={`${view}-${libraryQuery}`}>
+        <div className="page-content" key={pageKey}>
           {loading && (
             <p className="inline-note" role="status">
               Abriendo tu biblioteca…

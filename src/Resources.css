@@ -81,6 +81,9 @@
   border-radius: 10px;
   flex-shrink: 0;
   object-fit: cover;
+  object-position: center;
+  aspect-ratio: 1;
+  overflow: hidden;
 }
 .lyric-lines p {
   margin: 0 0 28px;

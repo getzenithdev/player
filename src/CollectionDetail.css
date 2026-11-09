@@ -1,0 +1,281 @@
+.collection-presentation {
+  position: relative;
+  isolation: isolate;
+  overflow: hidden;
+  border-radius: 20px;
+  padding: clamp(20px, 3vw, 40px);
+  margin-top: 20px;
+  background: var(--surface);
+}
+.workspace main.collection-view {
+  --collection-gutter: clamp(24px, 4vw, 64px);
+  isolation: isolate;
+  background: var(--canvas);
+}
+.collection-view > .collection-page-background {
+  position: sticky;
+  top: 0;
+  height: 0;
+  z-index: -1;
+  pointer-events: none;
+}
+.collection-page-background > .collection-atmosphere {
+  height: calc(100dvh - 106px);
+  max-height: none;
+}
+.collection-page-background .collection-atmosphere > img,
+.collection-page-background .collection-background-art {
+  opacity: 1;
+}
+.collection-page-background .collection-atmosphere::after {
+  background: rgb(0 0 0 / 48%);
+}
+.collection-view > .page-header {
+  padding-inline: var(--collection-gutter);
+  background: rgb(0 0 0 / 16%);
+  backdrop-filter: none;
+}
+.workspace:is([data-theme="light"], [data-theme="white"])
+  .collection-atmosphere::after {
+  background: rgb(255 255 255 / 68%);
+}
+.workspace:is([data-theme="light"], [data-theme="white"])
+  .collection-view
+  > .page-header {
+  background: rgb(255 255 255 / 16%);
+}
+@media (prefers-color-scheme: light) {
+  .workspace[data-theme="system"] .collection-atmosphere::after {
+    background: rgb(255 255 255 / 68%);
+  }
+  .workspace[data-theme="system"] .collection-view > .page-header {
+    background: rgb(255 255 255 / 16%);
+  }
+}
+.collection-view > .page-content {
+  max-width: none;
+  margin: 0;
+  padding: 8px var(--collection-gutter) 64px;
+}
+.collection-page .collection-back {
+  margin-block: 0 28px;
+}
+.collection-page .collection-presentation {
+  position: static;
+  isolation: auto;
+  overflow: visible;
+  border-radius: 0;
+  padding: 0;
+  margin: 0;
+  background: transparent;
+}
+.collection-page .collection-detail {
+  padding-block: 12px 24px;
+  margin-bottom: 32px;
+}
+.collection-page .collection-detail-body {
+  grid-template-columns: clamp(180px, 22vw, 300px) minmax(0, 1fr);
+  gap: clamp(28px, 4vw, 64px);
+}
+.collection-back {
+  gap: 9px;
+  min-height: 44px;
+  margin-top: 12px;
+}
+.collection-detail {
+  margin-bottom: 36px;
+}
+.collection-atmosphere {
+  position: absolute;
+  z-index: -1;
+  inset: 0 0 auto;
+  height: 760px;
+  max-height: 100%;
+  overflow: hidden;
+  pointer-events: none;
+  contain: strict;
+}
+.collection-atmosphere > img,
+.collection-atmosphere > .collection-background-art {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  filter: blur(28px);
+  transform: scale(1.12);
+  opacity: 0.5;
+}
+.collection-atmosphere::after {
+  content: "";
+  position: absolute;
+  inset: 0;
+  background: rgb(0 0 0 / 48%);
+}
+.collection-detail-body {
+  display: grid;
+  grid-template-columns: minmax(140px, 240px) minmax(0, 1fr);
+  align-items: end;
+  gap: clamp(22px, 4vw, 46px);
+  min-width: 0;
+}
+.collection-featured-cover,
+.collection-featured-artist {
+  display: block;
+  width: 100%;
+  aspect-ratio: 1;
+  border-radius: 14px;
+  box-shadow: 0 18px 48px -24px #0009;
+}
+.collection-featured-artist {
+  border-radius: 50%;
+}
+.collection-detail-copy {
+  min-width: 0;
+  padding-block: 8px;
+}
+.collection-kind {
+  font-size: 12px;
+  font-weight: 550;
+  color: var(--muted);
+  margin-bottom: 10px;
+}
+.collection-detail h2 {
+  font-size: clamp(28px, 4.5vw, 64px);
+  line-height: 1.06;
+  letter-spacing: -0.045em;
+  font-weight: 650;
+  text-wrap: balance;
+  overflow-wrap: anywhere;
+}
+.collection-artist-link {
+  display: inline-flex;
+  align-items: center;
+  gap: 10px;
+  border: 0;
+  background: none;
+  padding: 0;
+  min-height: 44px;
+  margin-top: 16px;
+  text-align: left;
+  font-weight: 550;
+}
+.collection-artist-link:hover > span:last-child {
+  text-decoration: underline;
+  text-underline-offset: 4px;
+}
+.artist-portrait {
+  display: inline-grid;
+  place-items: center;
+  overflow: hidden;
+  background: color-mix(in srgb, var(--accent) 14%, var(--surface));
+  color: var(--accent);
+  vertical-align: middle;
+}
+.artist-portrait > img {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+}
+.artist-initials {
+  font-size: clamp(24px, 4vw, 64px);
+  font-weight: 500;
+  letter-spacing: -0.06em;
+}
+.collection-artist-avatar {
+  width: 30px;
+  height: 30px;
+  flex-shrink: 0;
+  border-radius: 50%;
+}
+.collection-artist-avatar .artist-initials {
+  font-size: 11px;
+  letter-spacing: -0.03em;
+}
+.collection-facts {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 8px;
+  color: var(--muted);
+  font-size: 12px;
+  margin-top: 10px;
+  font-variant-numeric: tabular-nums;
+}
+.collection-subtitle {
+  color: var(--muted);
+  font-size: 12px;
+  margin-top: 8px;
+}
+.collection-detail-actions {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 12px 20px;
+  margin-top: 22px;
+}
+.collection-photo-button {
+  min-height: 44px;
+  color: var(--muted);
+}
+.collection-photo-button:hover:not(:disabled) {
+  color: var(--text);
+}
+.artist-discography {
+  margin-block: 32px;
+}
+.artist-discography .library-gallery {
+  grid-template-columns: repeat(auto-fill, minmax(140px, 1fr));
+}
+.collection-presentation .library-group {
+  margin-bottom: 16px;
+}
+@media (max-width: 760px) {
+  .collection-page .collection-detail-body {
+    grid-template-columns: minmax(120px, 180px) minmax(0, 1fr);
+    gap: 24px;
+  }
+  .collection-detail-body {
+    grid-template-columns: minmax(100px, 160px) minmax(0, 1fr);
+    align-items: center;
+  }
+  .collection-detail-actions {
+    gap: 8px 16px;
+  }
+  .collection-detail h2 {
+    font-size: clamp(26px, 5vw, 40px);
+  }
+}
+@media (max-width: 540px) {
+  .workspace main.collection-view {
+    --collection-gutter: 20px;
+  }
+  .collection-page .collection-detail-body {
+    grid-template-columns: minmax(0, 1fr);
+  }
+  .collection-presentation {
+    padding: 20px 14px;
+  }
+  .collection-detail-body {
+    grid-template-columns: minmax(0, 1fr);
+    gap: 20px;
+  }
+  .collection-featured-cover,
+  .collection-featured-artist {
+    width: min(65%, 220px);
+  }
+  .artist-discography .library-gallery {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+}
+@media (max-width: 650px) {
+  .collection-page-background > .collection-atmosphere {
+    height: calc(100dvh - 124px);
+  }
+}
+@media (prefers-reduced-transparency: reduce), (prefers-contrast: more) {
+  .collection-view > .page-header {
+    background: var(--canvas);
+  }
+  .collection-page-background .collection-atmosphere {
+    display: none;
+  }
+}
