@@ -1900,8 +1900,9 @@ fn remember_source_track(
             track.artist = Some(artist.clone());
         }
         if entry.album.is_some() { track.album = entry.album.clone(); }
+        track.metadata.identifiers.provider_track_ids.insert(provider.key().into(), id.into());
         track.edited = true;
-        crate::metadata::prepare(track)?;
+        crate::metadata::prepare_document(&mut doc)?;
         crate::library::save(storage, &doc)?;
     }
     Ok(())

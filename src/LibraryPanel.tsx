@@ -14,6 +14,7 @@ import {
   emptyLibrary,
   groupKey,
   groupIdentity,
+  artistName,
   metadataKey,
   libraryAction,
   libraryViews,
@@ -207,7 +208,7 @@ export function Library({
   }, [library.tracks, view, selectedGroup]);
   const artistAlbums = useMemo(() => {
     if (!selectedArtist) return [];
-    const name = metadataKey(selectedArtist.artist ?? "");
+    const name = metadataKey(artistName(selectedArtist));
     return albums
       .filter((items) =>
         items.some(
@@ -260,10 +261,10 @@ export function Library({
     const first = detailTracks[0];
     if (!first) return undefined;
     if (view === "Artistas" && !selectedArtistAlbum) return selectedArtist;
-    const name = first.album_artist ?? first.artist;
+    const name = first.album_artist ?? artistName(first);
     return (
       library.tracks.find(
-        (track) => metadataKey(track.artist ?? "") === metadataKey(name ?? ""),
+        (track) => metadataKey(artistName(track)) === metadataKey(name ?? ""),
       ) ?? { ...first, artist: name, metadata: undefined }
     );
   }, [detailTracks, library.tracks, selectedArtist, selectedArtistAlbum, view]);
@@ -460,7 +461,7 @@ export function Library({
           {collection
             ? "Volver"
             : selectedArtistAlbum
-              ? `Volver a ${selectedArtist?.artist ?? "artista"}`
+              ? `Volver a ${selectedArtist ? artistName(selectedArtist) : "artista"}`
               : `Volver a ${view.toLocaleLowerCase()}`}
         </button>
       )}
@@ -512,7 +513,7 @@ export function Library({
                 onOpenCollection({
                   kind: "artist",
                   key: groupIdentity(detailArtist, "Artistas"),
-                  title: detailArtist.artist ?? "Artista desconocido",
+                  title: artistName(detailArtist),
                 });
                 return;
               }
@@ -532,7 +533,7 @@ export function Library({
         {selectedArtist && !selectedArtistAlbum && artistAlbums.length > 0 && (
           <section
             className="artist-discography"
-            aria-label={`Álbumes de ${selectedArtist.artist ?? "artista"}`}
+            aria-label={`Álbumes de ${artistName(selectedArtist)}`}
           >
             <div className="section-heading">
               <h2>Álbumes</h2>
@@ -593,7 +594,7 @@ export function Library({
                         title:
                           view === "Álbumes"
                             ? (items[0].album ?? "Sin álbum")
-                            : (items[0].artist ?? "Artista desconocido"),
+                            : artistName(items[0]),
                       },
                       { view, query },
                     );
@@ -607,7 +608,7 @@ export function Library({
                   <ArtistArtwork
                     className="collection-art"
                     artistKey={key}
-                    name={items[0].artist ?? "Artista desconocido"}
+                    name={artistName(items[0])}
                     trackId={items[0].id}
                   />
                 ) : (

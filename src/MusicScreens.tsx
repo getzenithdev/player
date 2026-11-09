@@ -3,6 +3,7 @@ import type { AudioController } from "./audio";
 import { Icon } from "./Icon";
 import { TrackArtwork } from "./TrackArtwork";
 import { ExternalSearchResults } from "./ExternalSearchResults";
+import { FavoriteButton } from "./FavoriteButton";
 import { groupIdentity, groupKey, type LibraryTrack } from "./library";
 import {
   albumGroups,
@@ -221,32 +222,34 @@ function SongResults({
   return (
     <div className="discovery-songs">
       {tracks.map((t, i) => (
-        <button
-          key={t.id}
-          className={`discovery-song ${audio.state.track?.trackId === t.id ? "current" : ""}`}
-          disabled={!audio.available || !t.local_path || t.missing}
-          onClick={() =>
-            void audio.openEntries(
-              playableTracks(tracks.slice(i)).map(entryFromTrack),
-            )
-          }
-        >
-          <span className="song-index">{i + 1}</span>
-          <TrackArtwork
-            className="library-cover"
-            trackId={t.id}
-            fallbackId={t.artwork_id}
-          />
-          <span className="song-info">
-            <strong>{t.title}</strong>
-            <span>{t.artist ?? "Artista desconocido"}</span>
-          </span>
-          <span className="song-album">{t.album ?? "Sin álbum"}</span>
-          <span className="song-duration">
-            {formatTime(t.duration === null ? null : t.duration * 1000)}
-          </span>
-          <Icon name="play" size={16} />
-        </button>
+        <div className="discovery-song-row" key={t.id}>
+          <button
+            className={`discovery-song ${audio.state.track?.trackId === t.id ? "current" : ""}`}
+            disabled={!audio.available || !t.local_path || t.missing}
+            onClick={() =>
+              void audio.openEntries(
+                playableTracks(tracks.slice(i)).map(entryFromTrack),
+              )
+            }
+          >
+            <span className="song-index">{i + 1}</span>
+            <TrackArtwork
+              className="library-cover"
+              trackId={t.id}
+              fallbackId={t.artwork_id}
+            />
+            <span className="song-info">
+              <strong>{t.title}</strong>
+              <span>{t.artist ?? "Artista desconocido"}</span>
+            </span>
+            <span className="song-album">{t.album ?? "Sin álbum"}</span>
+            <span className="song-duration">
+              {formatTime(t.duration === null ? null : t.duration * 1000)}
+            </span>
+            <Icon name="play" size={16} />
+          </button>
+          <FavoriteButton track={t} disabled={!audio.available} />
+        </div>
       ))}
     </div>
   );
@@ -428,6 +431,7 @@ export function Search({
                 key={submitted.revision}
                 search={submitted.search}
                 audio={audio}
+                tracks={tracks}
               />
             )}
           <button

@@ -478,6 +478,25 @@
 .discovery-songs {
   display: grid;
 }
+.discovery-song-row {
+  display: flex;
+  align-items: center;
+  min-width: 0;
+}
+.search-favorite {
+  flex-shrink: 0;
+}
+.search-favorite button[aria-pressed="true"] {
+  color: var(--accent);
+}
+.search-favorite button[aria-pressed="true"] svg {
+  fill: currentColor;
+}
+.search-favorite [role="alert"] {
+  display: block;
+  max-width: 240px;
+  font-size: 12px;
+}
 .discovery-song {
   width: 100%;
   min-width: 0;

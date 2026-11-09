@@ -5,6 +5,52 @@ use crate::{
 };
 const A: &str = "12345678-1234-1234-1234-123456789abc";
 const B: &str = "abcdefab-1234-1234-1234-123456789abc";
+#[test]
+fn collection_names_normalize_collaborations_and_service_titles_without_losing_credits() {
+    let mut doc = TracksDocument::default();
+    for artist in ["Peso Pluma", "Peso pluma; Junior H", "Peso Pluma & Junior H", "Peso Pluma and Junior H", "Peso Pluma feat. Junior H"] {
+        doc.tracks.push(TrackEntry { title: "Song".into(), artist: Some(artist.into()), album: Some("Album".into()), ..Default::default() });
+    }
+    prepare_document(&mut doc).unwrap();
+    let artist_key = doc.tracks[0].metadata.artist_key.clone();
+    let album_key = doc.tracks[0].metadata.album_key.clone();
+    for track in &doc.tracks {
+        assert_eq!(track.metadata.artist_key, artist_key);
+        assert_eq!(track.metadata.album_key, album_key);
+    }
+    assert_eq!(doc.tracks[2].artist.as_deref(), Some("Peso Pluma & Junior H"));
+    assert_eq!(doc.tracks[2].metadata.artist_display, "Peso Pluma");
+    assert!(!prepare_document(&mut doc).unwrap());
+
+    let mut albums = TracksDocument { tracks: ["Graduation", "Graduation by Kanye West on Apple Music", "Graduation by Kanye West on Spotify"].into_iter().map(|album| TrackEntry {
+        title: "Song".into(), artist: Some("Song · Kanye West".into()), album: Some(album.into()), ..Default::default()
+    }).collect(), ..Default::default() };
+    prepare_document(&mut albums).unwrap();
+    for track in &albums.tracks {
+        assert_eq!(track.artist.as_deref(), Some("Kanye West"));
+        assert_eq!(track.album.as_deref(), Some("Graduation"));
+        assert_eq!(track.metadata.album_key, albums.tracks[0].metadata.album_key);
+    }
+    assert_eq!(albums.tracks[1].metadata.original.as_ref().unwrap().album.as_deref(), Some("Graduation by Kanye West on Apple Music"));
+    assert!(!prepare_document(&mut albums).unwrap());
+}
+
+#[test]
+fn ambiguous_band_names_and_distinct_album_editions_remain_intact() {
+    let mut doc = TracksDocument { tracks: ["Simon & Garfunkel", "Of Monsters and Men", "Earth, Wind & Fire", "AC/DC"].into_iter().map(|artist| TrackEntry {
+        title: "Song".into(), artist: Some(artist.into()), ..Default::default()
+    }).collect(), ..Default::default() };
+    prepare_document(&mut doc).unwrap();
+    for track in &doc.tracks { assert_eq!(track.metadata.artist_display, track.artist.as_deref().unwrap()); }
+    let mut deluxe = TrackEntry { title: "Song".into(), artist: Some("Kanye West".into()), album: Some("Graduation (Deluxe) by Kanye West on Apple Music".into()), ..Default::default() };
+    prepare(&mut deluxe).unwrap();
+    assert_eq!(deluxe.album.as_deref(), Some("Graduation (Deluxe)"));
+    let mut wrong_artist = deluxe.clone();
+    wrong_artist.album = Some("Graduation by Someone Else on Apple Music".into());
+    prepare(&mut wrong_artist).unwrap();
+    assert_eq!(wrong_artist.album.as_deref(), Some("Graduation by Someone Else on Apple Music"));
+    assert_ne!(deluxe.metadata.album_key, wrong_artist.metadata.album_key);
+}
 fn track(title: &str) -> TrackEntry {
     let mut t = TrackEntry {
         title: title.into(),

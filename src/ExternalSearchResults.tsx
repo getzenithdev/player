@@ -1,11 +1,14 @@
 import { useEffect, useState } from "react";
 import type { AudioController } from "./audio";
 import { SourceArtwork } from "./SourceArtwork";
+import { FavoriteButton } from "./FavoriteButton";
+import type { LibraryTrack } from "./library";
 import {
   entryActions,
   searchExternalSources,
   sourcesAction,
   preparedSourceEntry,
+  sourceLibraryTrack,
   type SourceEntry,
 } from "./sources";
 import "./Resources.css";
@@ -13,9 +16,11 @@ import "./Resources.css";
 export function ExternalSearchResults({
   search,
   audio,
+  tracks,
 }: {
   search: ReturnType<typeof searchExternalSources>;
   audio: AudioController;
+  tracks: LibraryTrack[];
 }) {
   const [result, setResult] = useState<Awaited<
     ReturnType<typeof searchExternalSources>
@@ -94,6 +99,14 @@ export function ExternalSearchResults({
                 </p>
               </div>
               <div className="resource-actions">
+                {actions?.play && (
+                  <FavoriteButton
+                    source={entry}
+                    tracks={tracks}
+                    track={sourceLibraryTrack(tracks, entry)}
+                    disabled={busy}
+                  />
+                )}
                 {actions?.play && (
                   <button
                     className="button small"

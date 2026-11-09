@@ -56,6 +56,7 @@ pub struct MetadataRecord {
     pub artist_disambiguation: Option<String>,
     pub qualifiers: Vec<String>,
     pub artist_key: String,
+    pub artist_display: String,
     pub album_key: String,
     /// Provider-specific inert JSON, retained without executing requests.
     pub provider_data: BTreeMap<String, Value>,
@@ -73,6 +74,56 @@ pub fn key(value: &str) -> String {
 }
 fn option(value: &Option<String>) -> Option<String> {
     value.as_deref().map(display).filter(|s| !s.is_empty())
+}
+// Keep the full credit on the track; collection names use the lead artist.
+fn artist_credit(value: &str, title: &str) -> String {
+    let value = display(value);
+    if let Some((prefix, artist)) = value.split_once('·') {
+        if ["song", "single", "album", "canción", "álbum"].contains(&key(prefix).as_str())
+            || key(prefix) == key(title)
+        {
+            return display(artist);
+        }
+    }
+    value
+}
+fn explicit_lead(value: &str) -> String {
+    let end = [";", " feat. ", " feat ", " ft. ", " featuring "]
+        .iter()
+        .filter_map(|separator| credit_separator(value, separator))
+        .min()
+        .unwrap_or(value.len());
+    display(&value[..end])
+}
+fn credit_separator(value: &str, separator: &str) -> Option<usize> {
+    value.char_indices().find_map(|(index, _)|
+        value[index..].to_lowercase().starts_with(separator).then_some(index))
+}
+fn lead_artist(value: &str, known: &BTreeSet<String>) -> String {
+    let lead = explicit_lead(value);
+    // An ampersand or "and" can also belong to a band's actual name.
+    // Split only when the lead has independent evidence in this library.
+    for separator in [" & ", " and "] {
+        if let Some(index) = credit_separator(&lead, separator) {
+            let candidate = display(&lead[..index]);
+            if known.contains(&key(&candidate)) {
+                return candidate;
+            }
+        }
+    }
+    lead
+}
+fn album_name(value: &str, artist: &str) -> String {
+    let value = display(value);
+    for service in ["apple music", "spotify", "youtube music", "amazon music", "deezer", "tidal"] {
+        let suffix = format!(" by {} on {service}", key(artist));
+        if let Some(index) = value.char_indices().find_map(|(index, _)|
+            (key(&value[index..]) == suffix.trim()).then_some(index)) {
+            let name = &value[..index];
+            if !name.trim().is_empty() { return display(name); }
+        }
+    }
+    value
 }
 fn valid_mbid(value: &Option<String>) -> Option<String> {
     let value = value.as_ref()?.trim().to_ascii_lowercase();
@@ -149,6 +200,9 @@ fn qualifiers(t: &TrackEntry) -> Vec<String> {
     .collect()
 }
 pub fn prepare(t: &mut TrackEntry) -> Result<(), String> {
+    prepare_with_artists(t, &BTreeSet::new())
+}
+fn prepare_with_artists(t: &mut TrackEntry, known: &BTreeSet<String>) -> Result<(), String> {
     if t.metadata.version > VERSION {
         return Err(format!(
             "Metadatos v{} no compatibles: {}",
@@ -172,6 +226,12 @@ pub fn prepare(t: &mut TrackEntry) -> Result<(), String> {
     t.artist = option(&t.artist);
     t.album_artist = option(&t.album_artist);
     t.album = option(&t.album);
+    t.artist = t.artist.as_deref().map(|value| artist_credit(value, &t.title));
+    t.album_artist = t.album_artist.as_deref().map(|value| artist_credit(value, &t.title));
+    if let (Some(album), Some(artist)) = (&t.album, t.album_artist.as_ref().or(t.artist.as_ref())) {
+        t.album = Some(album_name(album, artist));
+    }
+    t.metadata.artist_display = lead_artist(t.artist.as_deref().unwrap_or_default(), known);
     t.genre = option(&t.genre);
     t.source = Some(
         t.source
@@ -200,7 +260,7 @@ pub fn prepare(t: &mut TrackEntry) -> Result<(), String> {
         if n.artist.is_empty() {
             format!("unknown:{}", t.id)
         } else {
-            format!("name:{}", n.artist)
+            format!("name:{}", key(&t.metadata.artist_display))
         }
     });
     let release = valid_mbid(&t.metadata.identifiers.musicbrainz_release_id)
@@ -224,7 +284,7 @@ pub fn prepare(t: &mut TrackEntry) -> Result<(), String> {
         if n.album_artist.is_empty() {
             format!("unknown:{}", t.id)
         } else {
-            format!("name:{}", n.album_artist)
+            format!("name:{}", key(&lead_artist(t.album_artist.as_deref().unwrap_or(&t.metadata.artist_display), known)))
         }
     });
     t.metadata.album_key = serde_json::to_string(&(
@@ -246,9 +306,14 @@ pub fn prepare(t: &mut TrackEntry) -> Result<(), String> {
 }
 pub fn prepare_document(doc: &mut TracksDocument) -> Result<bool, String> {
     let before = doc.clone();
+    let known: BTreeSet<_> = doc.tracks.iter().flat_map(|t| {
+        [t.artist.as_deref(), t.album_artist.as_deref()].into_iter().flatten().map(|value| {
+            key(&explicit_lead(&artist_credit(value, &t.title)))
+        })
+    }).collect();
     let mut ids = BTreeSet::new();
     for t in &mut doc.tracks {
-        prepare(t)?;
+        prepare_with_artists(t, &known)?;
         if !ids.insert(t.id.clone()) {
             return Err(format!("Identidad interna repetida: {}", t.id));
         }

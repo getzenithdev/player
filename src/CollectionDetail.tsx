@@ -8,7 +8,7 @@ import {
 } from "./ArtistArtwork";
 import { TrackArtwork } from "./TrackArtwork";
 import { Icon } from "./Icon";
-import { groupIdentity, type LibraryTrack } from "./library";
+import { artistName, groupIdentity, type LibraryTrack } from "./library";
 import "./CollectionDetail.css";
 import { DeleteCollectionDialog } from "./DeleteCollectionDialog";
 
@@ -30,7 +30,7 @@ export function CollectionDetail({
   onDelete?: (ids: string[]) => Promise<void>;
 }) {
   const first = tracks[0];
-  const name = artist.artist ?? "Artista desconocido";
+  const name = artistName(artist);
   const artistKey = groupIdentity(artist, "Artistas");
   const photo = useArtistPhoto(artistKey, artist.id, true, name);
   const [busy, setBusy] = useState(false);

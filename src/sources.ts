@@ -1,5 +1,5 @@
 import { invoke } from "@tauri-apps/api/core";
-import { libraryAction } from "./library";
+import { libraryAction, type LibraryTrack } from "./library";
 import { entryFromPath, entryFromTrack } from "./playlists";
 
 export type ProviderId =
@@ -75,10 +75,58 @@ export const sourcesAction = (action: object): Promise<SourcesSnapshot> =>
 export async function preparedSourceEntry(path: string, source: SourceEntry) {
   const library = await libraryAction({ kind: "snapshot" });
   const track = library.tracks.find((track) => track.local_path === path);
-  return track ? entryFromTrack(track) : {
-    ...entryFromPath(path), title: source.name,
-    artist: source.artist ?? null, album: source.album ?? null,
-  };
+  return track
+    ? entryFromTrack(track)
+    : {
+        ...entryFromPath(path),
+        title: source.name,
+        artist: source.artist ?? null,
+        album: source.album ?? null,
+      };
+}
+
+export function sourceLibraryTrack(tracks: LibraryTrack[], entry: SourceEntry) {
+  const providers =
+    entry.provider === "youtube" || entry.provider === "youtube-auto"
+      ? ["youtube", "youtube-auto"]
+      : [entry.provider];
+  return tracks.find(
+    (track) =>
+      (entry.provider === "local" && track.id === entry.id) ||
+      providers.some(
+        (provider) =>
+          track.metadata?.identifiers.provider_track_ids?.[provider] ===
+            entry.id ||
+          (track.source === provider && track.source_id === entry.id),
+      ),
+  );
+}
+
+/** Prepare a playable local copy before saving an external result as a favorite. */
+export async function favoriteSource(
+  entry: SourceEntry,
+  tracks: LibraryTrack[],
+) {
+  let track = sourceLibraryTrack(tracks, entry);
+  if (!track) {
+    const prepared = await sourcesAction({
+      kind: "prepare",
+      provider: entry.provider,
+      id: entry.id,
+    });
+    if (!prepared.downloaded)
+      throw new Error("No se pudo preparar el audio para favoritos");
+    const snapshot = await libraryAction({ kind: "snapshot" });
+    track = snapshot.tracks.find(
+      (item) => item.local_path === prepared.downloaded,
+    );
+    if (!track) throw new Error("No se encontró el audio en la biblioteca");
+  }
+  return libraryAction({
+    kind: "favorite",
+    id: track.id,
+    favorite: !track.favorite,
+  });
 }
 
 /** Prefer the configured API for YouTube search, avoiding duplicate catalogs. */

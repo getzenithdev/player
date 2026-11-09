@@ -45,6 +45,7 @@ export interface MetadataRecord {
   artist_disambiguation?: string | null;
   qualifiers: string[];
   artist_key: string;
+  artist_display?: string;
   album_key: string;
   provider_data: Record<string, unknown>;
 }
@@ -134,6 +135,9 @@ export const libraryViews = [
   "Duplicados",
 ] as const;
 export type LibraryView = (typeof libraryViews)[number];
+export function artistName(track: LibraryTrack): string {
+  return track.metadata?.artist_display || track.artist || "Artista desconocido";
+}
 export function selectTracks(
   library: LibrarySnapshot,
   view: LibraryView,
@@ -194,7 +198,7 @@ export function groupKey(track: LibraryTrack, view: LibraryView): string {
       return `${track.album ?? "Sin álbum"} · ${track.album_artist ?? track.artist ?? "Artista desconocido"}`;
     case "Artistas":
       return (
-        (track.artist ?? "Artista desconocido") +
+        artistName(track) +
         (track.metadata?.artist_disambiguation
           ? ` · ${track.metadata.artist_disambiguation}`
           : "")
