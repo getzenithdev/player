@@ -121,10 +121,11 @@ pub fn apply_checkpoint(doc: &mut HistoryDocument, state: SessionState) {
 }
 pub fn checkpoint(
     storage: &StorageManager,
-    state: SessionState,
+    mut state: SessionState,
     save_queue: bool,
 ) -> Result<(), String> {
     let _operation = storage.library_lock();
+    crate::library_removal::filter_checkpoint(storage, &mut state)?;
     let mut doc = load(storage)?;
     let before = doc.clone();
     apply_checkpoint(&mut doc, state);

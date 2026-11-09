@@ -121,6 +121,9 @@ export async function chooseArtistPhoto(artistKey: string, trackId?: string) {
   });
   remember(artistKey, image);
 }
+export function forgetArtistPhotos() {
+  cache.clear();
+}
 
 export const ArtistArtwork = memo(function ArtistArtwork({
   artistKey,

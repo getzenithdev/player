@@ -545,6 +545,8 @@ pub fn upsert(doc: &mut TracksDocument, input: IncomingTrack) -> Result<String, 
         ..Default::default()
     };
     prepare(&mut t)?;
+    // An explicit import/preparation can restore a file removed from the library.
+    if let Some(path) = &t.local_path { doc.excluded_paths.remove(path); }
     if let Some(i) = existing {
         let old = &doc.tracks[i];
         t.id = old.id.clone();

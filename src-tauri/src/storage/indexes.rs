@@ -88,6 +88,11 @@ pub struct TracksDocument {
     pub tracks: Vec<TrackEntry>,
     #[serde(default)]
     pub locations: Vec<String>,
+    /// Explicit removals must not be undone by the folder watcher.
+    #[serde(default)]
+    pub excluded_paths: std::collections::BTreeSet<String>,
+    #[serde(default)]
+    pub removed_track_ids: std::collections::BTreeSet<String>,
 }
 
 /// Search result exposed to the interface.

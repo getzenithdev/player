@@ -1011,6 +1011,7 @@ mod tests {
             &crate::storage::indexes::TracksDocument {
                 tracks: vec![t.clone()],
                 locations: vec![],
+                ..Default::default()
             },
         )
         .unwrap();

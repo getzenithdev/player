@@ -4,6 +4,7 @@ mod audio_persistence;
 mod audio_processing;
 mod commands;
 mod library;
+mod library_removal;
 mod library_commands;
 mod lyrics;
 mod metadata;

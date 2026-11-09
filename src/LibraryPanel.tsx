@@ -28,7 +28,7 @@ import { TrackArtwork } from "./TrackArtwork";
 import { Icon } from "./Icon";
 import { entryFromTrack, usePlaylists } from "./playlists";
 import "./Playlists.css";
-import { ArtistArtwork } from "./ArtistArtwork";
+import { ArtistArtwork, forgetArtistPhotos } from "./ArtistArtwork";
 import { CollectionDetail } from "./CollectionDetail";
 import { albumGroups } from "./musicViews";
 import type { CollectionRoute, LibraryLocation } from "./navigation";
@@ -42,6 +42,7 @@ export function Library({
   onBack,
   onReady,
   backgroundTarget,
+  onCollectionDeleted,
 }: {
   audio: AudioController;
   initialView?: LibraryView;
@@ -54,6 +55,7 @@ export function Library({
   onBack?: () => void;
   onReady?: () => void;
   backgroundTarget?: HTMLElement | null;
+  onCollectionDeleted?: () => void;
 }) {
   const lists = usePlaylists();
   const [library, setLibrary] = useState(emptyLibrary);
@@ -469,6 +471,35 @@ export function Library({
       >
         {detailTracks.length > 0 && detailArtist && (
           <CollectionDetail
+            onDelete={async (expectedIds) => {
+              const album = view === "Álbumes" || !!selectedArtistAlbum;
+              const key = selectedArtistAlbum ?? selectedGroup;
+              if (!key)
+                throw new Error("Selecciona una colección para eliminar");
+              ++generation.current;
+              setBusy(true);
+              try {
+                const result = await libraryAction({
+                  kind: "removeCollection",
+                  collection: album ? "album" : "artist",
+                  key,
+                  expected_ids: expectedIds,
+                });
+                if (mounted.current) {
+                  ++generation.current;
+                  setLibrary(result);
+                  setWarnings(result.warnings);
+                  forgetArtistPhotos();
+                  if (onCollectionDeleted) onCollectionDeleted();
+                  else {
+                    setSelectedGroup(null);
+                    setSelectedArtistAlbum(null);
+                  }
+                }
+              } finally {
+                if (mounted.current) setBusy(false);
+              }
+            }}
             backgroundTarget={backgroundTarget}
             key={`${view}-${selectedGroup}-${selectedArtistAlbum ?? ""}`}
             kind={

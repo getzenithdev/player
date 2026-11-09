@@ -385,6 +385,9 @@ export default function App() {
           onBack={backFromCollection}
           onReady={restorePagePosition}
           backgroundTarget={collectionBackground}
+          onCollectionDeleted={() =>
+            navigate(activeCollection.kind === "album" ? "albums" : "artists")
+          }
         />
       );
     }

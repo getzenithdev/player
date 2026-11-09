@@ -50,6 +50,7 @@ impl MetadataEdit {
 #[serde(tag = "kind", rename_all = "camelCase")]
 pub enum LibraryAction {
     Snapshot,
+    RemoveCollection { collection: CollectionKind, key: String, expected_ids: Vec<String> },
     Import {
         paths: Vec<String>,
     },
@@ -74,6 +75,9 @@ pub enum LibraryAction {
         path: String,
     },
 }
+#[derive(Clone, Copy, Deserialize)]
+#[serde(rename_all = "lowercase")]
+pub enum CollectionKind { Album, Artist }
 #[derive(Serialize)]
 pub struct DuplicateGroup {
     pub ids: Vec<String>,
@@ -105,6 +109,7 @@ pub(crate) fn load(storage: &StorageManager) -> Result<TracksDocument, String> {
             .map_err(|e| e.to_string())?;
         storage.rebuild_indexes();
     }
+    crate::library_removal::remember(storage, &doc);
     Ok(doc)
 }
 pub(crate) fn save(storage: &StorageManager, doc: &TracksDocument) -> Result<(), String> {
@@ -112,9 +117,10 @@ pub(crate) fn save(storage: &StorageManager, doc: &TracksDocument) -> Result<(),
         .save_document(DOCUMENT, doc)
         .map_err(|e| e.to_string())?;
     storage.rebuild_indexes();
+    crate::library_removal::remember(storage, doc);
     Ok(())
 }
-fn snapshot(
+pub(crate) fn snapshot(
     storage: &StorageManager,
     mut doc: TracksDocument,
     mut warnings: Vec<String>,
@@ -200,11 +206,15 @@ pub fn execute(storage: &StorageManager, action: LibraryAction) -> Result<Librar
     let before = doc.clone();
     match action {
         LibraryAction::Snapshot => {}
+        LibraryAction::RemoveCollection { collection, key, expected_ids } => {
+            return super::library_removal::remove(storage, doc, collection, &key, expected_ids);
+        }
         LibraryAction::Import { paths } => {
             for path in paths {
                 match fs::canonicalize(&path) {
                     Ok(p) if p.is_dir() || p.is_file() => {
                         let value = p.to_string_lossy().into_owned();
+                        doc.excluded_paths.retain(|excluded| !Path::new(excluded).starts_with(&p));
                         if !doc.locations.contains(&value) {
                             doc.locations.push(value);
                         }
@@ -243,6 +253,7 @@ pub fn execute(storage: &StorageManager, action: LibraryAction) -> Result<Librar
                 return Err("El archivo de audio ya no está disponible".into());
             }
             let text = path.to_string_lossy().into_owned();
+            doc.excluded_paths.remove(&text);
             if !doc.locations.contains(&text) {
                 doc.locations.push(text.clone());
             }
@@ -421,6 +432,7 @@ pub(crate) fn reconcile(
     for path in files {
         let result = (|| -> Result<(), String> {
             let text = path.to_string_lossy().into_owned();
+            if doc.excluded_paths.contains(&text) { return Ok(()); }
             let stat = fs::metadata(&path).map_err(|e| e.to_string())?;
             let existing = doc
                 .tracks

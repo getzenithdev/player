@@ -10,6 +10,7 @@ import { TrackArtwork } from "./TrackArtwork";
 import { Icon } from "./Icon";
 import { groupIdentity, type LibraryTrack } from "./library";
 import "./CollectionDetail.css";
+import { DeleteCollectionDialog } from "./DeleteCollectionDialog";
 
 export function CollectionDetail({
   kind,
@@ -18,6 +19,7 @@ export function CollectionDetail({
   onArtist,
   onPlay,
   backgroundTarget,
+  onDelete,
 }: {
   kind: "album" | "artist";
   tracks: LibraryTrack[];
@@ -25,6 +27,7 @@ export function CollectionDetail({
   onArtist: () => void;
   onPlay: () => void;
   backgroundTarget?: HTMLElement | null;
+  onDelete?: (ids: string[]) => Promise<void>;
 }) {
   const first = tracks[0];
   const name = artist.artist ?? "Artista desconocido";
@@ -32,6 +35,7 @@ export function CollectionDetail({
   const photo = useArtistPhoto(artistKey, artist.id, true, name);
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState("");
+  const [deletion, setDeletion] = useState<{ ids: string[]; title: string }>();
   const title = kind === "album" ? (first.album ?? "Sin álbum") : name;
   const duration = tracks.reduce(
     (total, track) => total + (track.duration ?? 0),
@@ -143,6 +147,17 @@ export function CollectionDetail({
                   : "Añadir foto del artista"}
             </button>
           </div>
+          {onDelete && (
+            <button
+              className="text-button collection-delete-button"
+              disabled={!isTauri() || busy}
+              onClick={() =>
+                setDeletion({ ids: tracks.map((track) => track.id), title })
+              }
+            >
+              Eliminar {kind === "album" ? "álbum" : "artista"} de la biblioteca
+            </button>
+          )}
           {error && (
             <p className="error-note" role="alert">
               {error}
@@ -150,6 +165,15 @@ export function CollectionDetail({
           )}
         </div>
       </div>
+      {deletion && onDelete && (
+        <DeleteCollectionDialog
+          kind={kind}
+          title={deletion.title}
+          trackIds={deletion.ids}
+          onDelete={onDelete}
+          onClose={() => setDeletion(undefined)}
+        />
+      )}
     </header>
   );
 }

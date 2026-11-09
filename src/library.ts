@@ -96,6 +96,12 @@ export interface LibrarySnapshot {
   };
 }
 export type LibraryAction =
+  | {
+      kind: "removeCollection";
+      collection: "album" | "artist";
+      key: string;
+      expected_ids: string[];
+    }
   | { kind: "snapshot" | "rescan" }
   | { kind: "importMetadata"; path: string }
   | { kind: "import"; paths: string[] }

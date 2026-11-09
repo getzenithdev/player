@@ -10,12 +10,17 @@ pub async fn library_action(
     action: LibraryAction,
 ) -> Result<LibrarySnapshot, String> {
     tauri::async_runtime::spawn_blocking(move || {
+        let removal = matches!(&action, LibraryAction::RemoveCollection { .. });
         let mutation = !matches!(action, LibraryAction::Snapshot);
         let snapshot = execute(&app.state::<StorageManager>(), action)?;
         // Events carry no library payload, preventing large snapshots from
         // being duplicated in every open window.
         if mutation {
             let _ = app.emit("library:changed", ());
+        }
+        if removal {
+            let _ = app.emit("playlists:changed", ());
+            let _ = app.emit("artwork:changed", ());
         }
         Ok(snapshot)
     })

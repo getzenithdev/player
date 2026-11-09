@@ -669,6 +669,7 @@ mod tests {
                     ..Default::default()
                 }],
                 locations: vec![],
+                ..Default::default()
             },
         )
         .unwrap();
