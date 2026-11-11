@@ -10,6 +10,8 @@ A snapshot discovers embedded library artwork and associated same-name JPG/PNG o
 
 ## Validation and animation
 
+Once loaded, static covers and artist portraits remain in their mounted components when scrolled out of view or when the window is hidden. Visibility still gates initial image requests and refreshes. Animation has a separate lifecycle: offscreen video playback is detached and decoded GIF frames are released after 15 seconds of inactivity, while the static poster remains available. Changing motion settings or preview quality does not clear the same song's static cover while its replacement is loading.
+
 PNG, JPEG, WebP and GIF are content-probed and decoded, rather than accepted by extension. Limits: 15 MiB encoded, 8192px dimensions, at least 32px per side, 64 MiB decoder allocation. GIF animation is limited to 120 frames and 64 MiB cumulative decoded pixels. Invalid/truncated images and unsupported SVG/HTML are rejected. Dimensions are preserved rather than distorted to match an assumed square.
 
 Animated GIF is decoded in a native blocking worker into bounded 512px frames; the UI schedules their real delays. Autoplay, manual pause, looping, thumbnail/preview quality and battery saving persist. Autoplay defaults off and battery saving defaults on. Visibility observers, document visibility and reduced-motion changes stop scheduling frames and show the static preview. Offscreen animations are not loaded. Original GIF, thumbnail and preview are kept; video/MP4/HLS animation is not supported by this initial implementation.

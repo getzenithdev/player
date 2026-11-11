@@ -73,11 +73,7 @@ export function useArtistPhoto(
   const [photo, setPhoto] = useState<{ key: string; image: string | null }>();
   const appVisible = useAppVisibility();
   const active = enabled && appVisible;
-  useEffect(() => {
-    if (active) return;
-    const timer = window.setTimeout(() => setPhoto(undefined), 15_000);
-    return () => window.clearTimeout(timer);
-  }, [active]);
+  // Visibility gates requests, not the lifetime of an already loaded portrait.
   useEffect(() => {
     if (!active || !artistKey || !isTauri()) return;
     const notify = (image: string | null) =>

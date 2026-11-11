@@ -34,14 +34,9 @@ export const TrackArtwork = memo(function TrackArtwork({
   quality?: "thumbnail" | "preview";
   thumbnail?: string | null;
 }) {
-  const identity = JSON.stringify([
-    trackId,
-    path,
-    fallbackId,
-    animate,
-    quality,
-    thumbnail,
-  ]);
+  // The static image belongs to the song, independently of whether motion is
+  // enabled or a different preview quality is being requested.
+  const identity = JSON.stringify([trackId, path, fallbackId, thumbnail]);
   const [loaded, setLoaded] = useState<{ key: string; value: LoadedArtwork }>();
   // Render only resources belonging to this song; an old response never flashes
   // the preceding song's cover while its replacement loads.
@@ -88,19 +83,13 @@ export const TrackArtwork = memo(function TrackArtwork({
   }, [identity]);
 
   useEffect(() => {
-    if (nearby && appVisible) return;
+    if (active) return;
+    // Release only decoded motion resources. Keep the loaded static poster
+    // while mounted, including when the window is hidden or scrolled away.
     const timer = window.setTimeout(() => {
-      setLoaded(undefined);
       setFrames(undefined);
-      setFailedPoster("");
       setReady("");
     }, 15_000);
-    return () => window.clearTimeout(timer);
-  }, [nearby, appVisible]);
-
-  useEffect(() => {
-    if (active) return;
-    const timer = window.setTimeout(() => setFrames(undefined), 15_000);
     return () => window.clearTimeout(timer);
   }, [active]);
 
