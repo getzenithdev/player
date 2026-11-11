@@ -1,6 +1,8 @@
 # Progressive external audio
 
-External **Play** (`prepare`) now returns a stable `zenith-source:<provider>:<encoded-id>` reference. It remembers provider metadata without downloading the audio. Only explicit **Download** writes a completed file into `cache/audio/`. Local file playback continues through its existing decoder.
+External **Play** (`prepare`) returns a stable `zenith-source:<provider>:<encoded-id>` reference without inserting a library track or downloading the audio. The queue holds the title, artist, album and public thumbnail needed for playback. Only explicit **Download** writes a completed file into `cache/audio/`; downloads remain in Downloads without importing themselves into the music library. Local file playback continues through its existing decoder.
+
+An explicit **Favorite** action promotes external catalog metadata into the library. Removing an external favorite removes it from the library's song, artist and album views, while local files stay visible. Older unfavorited stream and application-cache records are excluded from library snapshots, metadata analysis and search indexes without deleting music, queue entries or history. Their internal metadata can still resolve previously saved playback references.
 
 The native audio worker opens remote references through `network_audio.rs`. A separate thread resolves credentials and short-lived URLs, receives HTTP data and decodes it. The device callback consumes decoded samples; it never waits for HTTP or runs an extractor. The existing processing chain still applies equalization, balance, volume and limiting.
 

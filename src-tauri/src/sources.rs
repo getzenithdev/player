@@ -17,7 +17,6 @@ use serde::{Deserialize, Serialize};
 use sha2::{Digest, Sha256};
 use std::{
     collections::BTreeMap,
-    fs,
     io::{Read as _, Write as _},
     net::TcpListener,
     path::{Path, PathBuf},
@@ -301,6 +300,17 @@ pub enum Action {
     Prepare {
         provider: ProviderId,
         id: String,
+    },
+    Favorite {
+        provider: ProviderId,
+        id: String,
+        favorite: bool,
+        #[serde(default)]
+        name: Option<String>,
+        #[serde(default)]
+        artist: Option<String>,
+        #[serde(default)]
+        album: Option<String>,
     },
 }
 
@@ -1880,43 +1890,23 @@ fn cache_results(storage: &StorageManager, entries: &[Entry]) -> Result<(), Stri
     save(storage, &document)
 }
 
-fn remember_source_track(
-    storage: &StorageManager, provider: ProviderId, id: &str, path: &str,
+/// Only the explicit favorite action promotes catalog metadata into the library.
+fn save_source_favorite(
+    storage: &StorageManager, provider: ProviderId, id: &str, favorite: bool,
 ) -> Result<(), String> {
-    if provider == ProviderId::Local { return Ok(()); }
-    let entry = load(storage)?.cached_results.get(&format!("{provider:?}:{id}")).cloned();
-    let Some(entry) = entry else { return Ok(()); };
-    if is_stream_reference(path) {
-        let _lock = storage.library_lock();
-        let mut doc = crate::library::load(storage)?;
-        crate::metadata::upsert(&mut doc, crate::metadata::IncomingTrack {
-            source: provider.key().into(), source_id: Some(id.into()),
-            title: entry.name, artist: entry.artist, album: entry.album,
-            ..Default::default()
-        })?;
-        crate::library::save(storage, &doc)?;
-        return Ok(());
-    }
-    crate::library::execute(storage, crate::library::LibraryAction::Import {
-        paths: vec![path.to_string()],
+    let entry = load(storage)?.cached_results.get(&format!("{provider:?}:{id}")).cloned()
+        .ok_or("No se encontraron los metadatos del favorito")?;
+    let _lock = storage.library_lock();
+    let mut doc = crate::library::load(storage)?;
+    let track_id = crate::metadata::upsert(&mut doc, crate::metadata::IncomingTrack {
+        source: provider.key().into(), source_id: Some(id.into()),
+        title: entry.name, artist: entry.artist, album: entry.album,
+        ..Default::default()
     })?;
-    let canonical = fs::canonicalize(path).map_err(|e| e.to_string())?;
-    {
-        let _lock = storage.library_lock();
-        let mut doc = crate::library::load(storage)?;
-        let Some(track) = doc.tracks.iter_mut().find(|track| track.local_path.as_ref()
-            .is_some_and(|p| Path::new(p) == canonical)) else { return Ok(()); };
-        track.title = entry.name.clone();
-        if let Some(artist) = entry.artist.as_ref().filter(|v| !v.trim().is_empty()) {
-            track.artist = Some(artist.clone());
-        }
-        if entry.album.is_some() { track.album = entry.album.clone(); }
-        track.metadata.identifiers.provider_track_ids.insert(provider.key().into(), id.into());
-        track.edited = true;
-        crate::metadata::prepare_document(&mut doc)?;
-        crate::library::save(storage, &doc)?;
-    }
-    Ok(())
+    let track = doc.tracks.iter_mut().find(|track| track.id == track_id)
+        .ok_or("No se pudo guardar el favorito")?;
+    track.favorite = favorite;
+    crate::library::save(storage, &doc)
 }
 
 // --- adapters ----------------------------------------------------------------
@@ -1953,6 +1943,12 @@ fn local_download(storage: &StorageManager, id: &str) -> Result<String, String> 
             .find(|track| track.id == id)
             .ok_or("Canción no encontrada")?
     };
+    if track.local_path.is_none()
+        && let (Some(provider), Some(id)) = (&track.source, &track.source_id)
+    {
+        let reference = stream_reference(provider, id);
+        if is_stream_reference(&reference) { return Ok(reference); }
+    }
     let path = track
         .local_path
         .ok_or("La canción no tiene archivo local")?;
@@ -2966,8 +2962,24 @@ fn execute_with(
                 safe_id(&id)?;
                 stream_reference(provider.key(), &id)
             });
-            if let Some(path) = &downloaded {
-                remember_source_track(storage, provider, &id, path)?;
+        }
+        Action::Favorite { provider, id, favorite, name, artist, album } => {
+            if provider == ProviderId::Local {
+                crate::library::execute(storage, crate::library::LibraryAction::Favorite { id, favorite })?;
+            } else {
+                safe_id(&id)?;
+                let reference = stream_reference(provider.key(), &id);
+                // Preserve catalog metadata even when the original search has
+                // fallen out of the bounded results cache (e.g. a saved queue).
+                if !load(storage)?.cached_results.contains_key(&format!("{provider:?}:{id}")) {
+                    cache_results(storage, &[Entry {
+                        provider, id: id.clone(), name: name.unwrap_or_else(|| id.clone()),
+                        artist, album, kind: "audio".into(), detail: String::new(),
+                        size: None, source_url: None, thumbnail: None,
+                    }])?;
+                }
+                save_source_favorite(storage, provider, &id, favorite)?;
+                downloaded = Some(reference);
             }
         }
         Action::Download { provider, id, name } => {
@@ -2975,7 +2987,6 @@ fn execute_with(
                 ensure_external(storage)?;
             }
             let path = download(storage, store, env, provider, &id)?;
-            remember_source_track(storage, provider, &id, &path)?;
             if provider != ProviderId::Local {
                 let filename = Path::new(&path)
                     .file_name()
@@ -3018,14 +3029,15 @@ pub async fn sources_action(app: tauri::AppHandle, action: Action) -> Result<Sna
         ..Env::default()
     };
     tauri::async_runtime::spawn_blocking(move || {
+        let favorite_changed = matches!(&action, Action::Favorite { .. });
         let source = match &action {
-            Action::Prepare { provider, id } | Action::Download { provider, id, .. }
-                if *provider != ProviderId::Local => Some((*provider, id.clone())),
+            Action::Favorite { provider, id, favorite: true, .. }
+                if *provider != ProviderId::Local && external_enabled(&app.state::<StorageManager>()) => Some((*provider, id.clone())),
             _ => None,
         };
         let result = execute_with(&app.state::<StorageManager>(), &OsVault, &env, action)?;
+        if favorite_changed { let _ = app.emit("library:changed", ()); }
         if let (Some((provider, id)), Some(path)) = (source, result.downloaded.as_ref()) {
-            let _ = app.emit("library:changed", ());
             let storage = app.state::<StorageManager>();
             let entry = load(&storage)?.cached_results.get(&format!("{provider:?}:{id}")).cloned();
             let track = {

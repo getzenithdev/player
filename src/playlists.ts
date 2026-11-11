@@ -13,6 +13,7 @@ export interface MediaEntry {
   format: string;
   durationMs: number | null;
   available: boolean;
+  thumbnail?: string | null;
 }
 export interface Playlist {
   id: string;

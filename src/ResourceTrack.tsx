@@ -3,6 +3,7 @@ import { isTauri } from "@tauri-apps/api/core";
 import { listen } from "@tauri-apps/api/event";
 import type { AudioController } from "./audio";
 import { libraryAction, type LibraryTrack } from "./library";
+import { entryFromTrack } from "./playlists";
 export function useResourceTrack(audio: AudioController) {
   const [tracks, setTracks] = useState<LibraryTrack[]>([]);
   const [chosen, setChosen] = useState("");
@@ -36,7 +37,9 @@ export function useResourceTrack(audio: AudioController) {
     () =>
       tracks.find((t) => t.id === chosen) ??
       tracks.find((t) => !!current?.trackId && t.id === current.trackId) ??
-      tracks.find((t) => !!current?.path && t.local_path === current.path),
+      tracks.find(
+        (t) => !!current?.path && entryFromTrack(t).path === current.path,
+      ),
     [tracks, chosen, current?.trackId, current?.path],
   );
   const selector = useMemo(

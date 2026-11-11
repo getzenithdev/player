@@ -120,11 +120,18 @@ pub(crate) fn save(storage: &StorageManager, doc: &TracksDocument) -> Result<(),
     crate::library_removal::remember(storage, doc);
     Ok(())
 }
+/// Playback/catalog metadata may remain for history and saved queues, but only
+/// favorites and user-owned local files belong to the listening library.
+pub(crate) fn belongs_to_library(storage: &StorageManager, track: &TrackEntry) -> bool {
+    track.favorite || track.local_path.as_ref().is_some_and(|path|
+        !Path::new(path).starts_with(storage.document_path("cache/audio")))
+}
 pub(crate) fn snapshot(
     storage: &StorageManager,
     mut doc: TracksDocument,
     mut warnings: Vec<String>,
 ) -> LibrarySnapshot {
+    doc.tracks.retain(|track| belongs_to_library(storage, track));
     if let Err(error) = crate::session::overlay(storage, &mut doc.tracks) {
         warnings.push(error);
     }

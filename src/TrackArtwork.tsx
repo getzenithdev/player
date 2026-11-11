@@ -23,6 +23,7 @@ export const TrackArtwork = memo(function TrackArtwork({
   fallbackId,
   path,
   quality,
+  thumbnail,
 }: {
   trackId?: string | null;
   className?: string;
@@ -31,6 +32,7 @@ export const TrackArtwork = memo(function TrackArtwork({
   fallbackId?: string | null;
   path?: string | null;
   quality?: "thumbnail" | "preview";
+  thumbnail?: string | null;
 }) {
   const identity = JSON.stringify([
     trackId,
@@ -38,6 +40,7 @@ export const TrackArtwork = memo(function TrackArtwork({
     fallbackId,
     animate,
     quality,
+    thumbnail,
   ]);
   const [loaded, setLoaded] = useState<{ key: string; value: LoadedArtwork }>();
   // Render only resources belonging to this song; an old response never flashes
@@ -245,7 +248,7 @@ export const TrackArtwork = memo(function TrackArtwork({
     return () => window.clearTimeout(timer);
   }, [active, currentFrames, gifKey]);
 
-  const poster = data?.poster;
+  const poster = data?.poster || thumbnail;
   const image =
     active && currentFrames
       ? (currentFrames.items[currentFrames.index]?.url ?? poster)

@@ -84,6 +84,7 @@ export async function preparedSourceEntry(path: string, source: SourceEntry) {
         title: source.name,
         artist: source.artist ?? null,
         album: source.album ?? null,
+        thumbnail: source.thumbnail ?? null,
       };
 }
 
@@ -104,29 +105,65 @@ export function sourceLibraryTrack(tracks: LibraryTrack[], entry: SourceEntry) {
   );
 }
 
-/** Remember provider metadata before saving a result as a favorite. No media download. */
+/** Only an explicit favorite saves external catalog metadata to the library. */
 export async function favoriteSource(
   entry: SourceEntry,
   tracks: LibraryTrack[],
 ) {
-  let track = sourceLibraryTrack(tracks, entry);
+  const track = sourceLibraryTrack(tracks, entry);
   if (!track) {
-    const prepared = await sourcesAction({
-      kind: "prepare",
+    return sourcesAction({
+      kind: "favorite",
       provider: entry.provider,
       id: entry.id,
+      favorite: true,
+      name: entry.name,
+      artist: entry.artist ?? null,
+      album: entry.album ?? null,
     });
-    if (!prepared.downloaded)
-      throw new Error("No se pudo preparar el audio para favoritos");
-    const snapshot = await libraryAction({ kind: "snapshot" });
-    track = sourceLibraryTrack(snapshot.tracks, entry);
-    if (!track) throw new Error("No se encontró el audio en la biblioteca");
   }
   return libraryAction({
     kind: "favorite",
     id: track.id,
     favorite: !track.favorite,
   });
+}
+
+/** Recover provider identity from queue/history without inserting a library row. */
+export function sourceFromPlayback(track: {
+  path: string;
+  title: string;
+  artist: string | null;
+  album: string | null;
+}): SourceEntry | null {
+  const match = /^zenith-source:([^:]+):(.+)$/.exec(track.path);
+  if (
+    !match ||
+    ![
+      "youtube",
+      "youtube-auto",
+      "google-drive",
+      "dropbox",
+      "onedrive",
+      "webdav",
+    ].includes(match[1])
+  )
+    return null;
+  try {
+    return {
+      provider: match[1] as ProviderId,
+      id: decodeURIComponent(match[2]),
+      name: track.title,
+      artist: track.artist,
+      album: track.album,
+      kind: "audio",
+      detail: "",
+      size: null,
+      source_url: null,
+    };
+  } catch {
+    return null;
+  }
 }
 
 /** Prefer the configured API for YouTube search, avoiding duplicate catalogs. */

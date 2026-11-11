@@ -37,6 +37,9 @@ pub struct Entry {
     pub duration_ms: Option<u64>,
     #[serde(default)]
     pub format: String,
+    /// Public catalog cover for a transient stream, independent of the library.
+    #[serde(default)]
+    pub thumbnail: Option<String>,
 }
 impl Entry {
     pub fn from_path(path: &Path) -> Self {
@@ -58,6 +61,7 @@ impl Entry {
                 .to_string_lossy()
                 .to_uppercase(),
             duration_ms: None,
+            thumbnail: None,
         }
     }
 }

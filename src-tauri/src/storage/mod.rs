@@ -636,7 +636,8 @@ impl StorageManager {
                 Vec::new()
             }
         };
-        let indexes = LibraryIndexes::rebuild(tracks);
+        let indexes = LibraryIndexes::rebuild(tracks.into_iter()
+            .filter(|track| crate::library::belongs_to_library(self, track)).collect());
         lock(&self.state).indexes = indexes;
     }
 

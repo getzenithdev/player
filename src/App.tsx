@@ -8,6 +8,11 @@ import {
   type CSSProperties,
 } from "react";
 import { pickAudioFiles, useAudioEngine } from "./audio";
+import {
+  favoriteSource,
+  sourceFromPlayback,
+  sourceLibraryTrack,
+} from "./sources";
 import { accessibilityAttributes, playbackAnnouncement } from "./accessibility";
 import { Icon } from "./Icon";
 import {
@@ -118,15 +123,17 @@ export default function App() {
   const search = useRef<HTMLInputElement>(null);
   const audio = useAudioEngine();
   const { library, loading, error, reload } = useMusicLibrary();
-  const current = useMemo(
-    () =>
-      library.tracks.find(
-        (t) =>
-          t.id === audio.state.track?.trackId ||
-          t.local_path === audio.state.track?.path,
-      ),
-    [library.tracks, audio.state.track?.trackId, audio.state.track?.path],
-  );
+  const current = useMemo(() => {
+    const playing = audio.state.track;
+    if (!playing) return undefined;
+    const saved = library.tracks.find(
+      (track) =>
+        track.id === playing.trackId || track.local_path === playing.path,
+    );
+    if (saved) return saved;
+    const source = sourceFromPlayback(playing);
+    return source ? sourceLibraryTrack(library.tracks, source) : undefined;
+  }, [library.tracks, audio.state.track]);
   const favoriteCount = useMemo(
     () => library.tracks.filter((track) => track.favorite).length,
     [library.tracks],
@@ -365,7 +372,9 @@ export default function App() {
           favorite: !current.favorite,
         });
       } else {
-        await libraryAction({ kind: "favoriteLocal", path: playing.path });
+        const source = sourceFromPlayback(playing);
+        if (source) await favoriteSource(source, library.tracks);
+        else await libraryAction({ kind: "favoriteLocal", path: playing.path });
       }
       await reload();
     } catch (reason) {

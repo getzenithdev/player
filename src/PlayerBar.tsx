@@ -75,6 +75,7 @@ export function PlayerBar({
           trackId={current?.id ?? track?.trackId}
           path={track?.path}
           fallbackId={current?.artwork_id}
+          thumbnail={track?.thumbnail}
           animate
           paused={!isPlaying}
         />
@@ -89,9 +90,10 @@ export function PlayerBar({
           >
             <TrackArtwork
               className="mini-artwork"
-              trackId={track?.trackId}
+              trackId={current?.id ?? track?.trackId}
               path={track?.path}
               fallbackId={current?.artwork_id}
+              thumbnail={track?.thumbnail}
             />
           </button>
         )}

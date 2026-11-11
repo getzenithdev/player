@@ -1,4 +1,5 @@
 import { useEffect, useRef, useState } from "react";
+import { sourceFromPlayback } from "./sources";
 import type { AudioController } from "./audio";
 import type { LibraryTrack } from "./library";
 import type { AppView } from "./navigation";
@@ -12,6 +13,8 @@ import "./ExpandedPlayer.css";
 
 const sourceLabels: Record<string, string> = {
   local: "Tu biblioteca",
+  youtube: "YouTube",
+  "youtube-auto": "YouTube",
   "google-drive": "Google Drive",
   dropbox: "Dropbox",
   onedrive: "OneDrive",
@@ -139,6 +142,7 @@ export function ExpandedPlayer({
         trackId={current?.id ?? track?.trackId}
         path={track?.path}
         fallbackId={current?.artwork_id}
+        thumbnail={track?.thumbnail}
       />
       <header className="expanded-header">
         <button
@@ -150,7 +154,13 @@ export function ExpandedPlayer({
         >
           <Icon name="minimize" size={24} />
         </button>
-        <span>{sourceLabels[current?.source ?? "local"] ?? "Ahora suena"}</span>
+        <span>
+          {sourceLabels[
+            current?.source ??
+              (track && sourceFromPlayback(track)?.provider) ??
+              "local"
+          ] ?? "Ahora suena"}
+        </span>
         <div className="expanded-header-actions">
           <button
             className={`icon-button ${showQueue ? "active" : ""}`}
