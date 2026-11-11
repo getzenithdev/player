@@ -323,7 +323,12 @@ pub(super) fn resolve_stream(tools: &Path, id: &str, cancel: &AtomicBool) -> Res
     let headers = value.get("http_headers").and_then(|v| v.as_object()).map(|values| {
         values.iter().filter_map(|(key, value)| value.as_str().map(|v| (key.clone(), v.to_string()))).collect()
     }).unwrap_or_default();
-    Ok(crate::network_audio::RemoteAudio { url, headers, hint: Some("m4a".into()) })
+    let field = |key: &str| value.get(key).and_then(|v| v.as_str())
+        .map(str::trim).filter(|v| !v.is_empty()).map(|v| v.chars().take(512).collect());
+    let metadata = crate::network_audio::RemoteMetadata {
+        title: field("track"), artist: field("artist"), album: field("album"),
+    };
+    Ok(crate::network_audio::RemoteAudio { url, headers, hint: Some("m4a".into()), metadata: Some(metadata) })
 }
 
 fn valid_audio(path: &Path) -> bool {

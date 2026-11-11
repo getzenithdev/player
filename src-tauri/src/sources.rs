@@ -2470,7 +2470,7 @@ pub fn resolve_stream(app: &tauri::AppHandle, path: &str, cancel: &AtomicBool) -
     let entry = load(&storage)?.cached_results.get(&format!("{provider:?}:{id}")).cloned();
     let hint = entry.as_ref().and_then(|e| Path::new(&e.name).extension()).and_then(|ext| ext.to_str())
         .or_else(|| Path::new(&id).extension().and_then(|ext| ext.to_str())).map(str::to_lowercase);
-    Ok(crate::network_audio::RemoteAudio { url, headers, hint })
+    Ok(crate::network_audio::RemoteAudio { url, headers, hint, metadata: None })
 }
 
 /// Remove presentation labels, preserving musical versions such as live/remix.

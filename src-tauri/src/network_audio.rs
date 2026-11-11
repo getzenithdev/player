@@ -26,6 +26,13 @@ pub struct RemoteAudio {
     pub url: String,
     pub headers: Vec<(String, String)>,
     pub hint: Option<String>,
+    pub metadata: Option<RemoteMetadata>,
+}
+#[derive(Clone, Default)]
+pub struct RemoteMetadata {
+    pub title: Option<String>,
+    pub artist: Option<String>,
+    pub album: Option<String>,
 }
 pub type Resolver = Arc<dyn Fn(&AtomicBool) -> Result<RemoteAudio, String> + Send + Sync>;
 
@@ -42,6 +49,7 @@ pub struct StreamInfo {
     pub channels: u16,
     pub duration: Option<Duration>,
     pub format: String,
+    pub metadata: Option<RemoteMetadata>,
 }
 struct PcmBlock {
     start: u64,
@@ -277,6 +285,7 @@ impl Source for NetworkSource {
 fn decode(resolve: Resolver, shared: &Arc<Shared>, at: Duration) -> Result<(), String> {
     let reader = HttpReader::open(resolve, shared.clone())?;
     let hint = reader.remote.hint.clone();
+    let metadata = reader.remote.metadata.clone();
     let length = reader.length;
     let mut builder = Decoder::builder()
         .with_data(reader)
@@ -296,6 +305,7 @@ fn decode(resolve: Resolver, shared: &Arc<Shared>, at: Duration) -> Result<(), S
         channels: decoder.channels().get(),
         duration: decoder.total_duration(),
         format: hint.unwrap_or_else(|| "STREAM".into()).to_uppercase(),
+        metadata,
     };
     if info.channels > 8 || info.sample_rate > 192_000 {
         return Err("Formato de streaming fuera de los límites de audio".into());

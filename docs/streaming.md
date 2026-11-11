@@ -4,6 +4,8 @@ External **Play** (`prepare`) returns a stable `zenith-source:<provider>:<encode
 
 An explicit **Favorite** action promotes external catalog metadata into the library. Removing an external favorite removes it from the library's song, artist and album views, while local files stay visible. Older unfavorited stream and application-cache records are excluded from library snapshots, metadata analysis and search indexes without deleting music, queue entries or history. Their internal metadata can still resolve previously saved playback references.
 
+Lyrics and artwork can also resolve a stream directly from its queue entry. Resource requests use the stable provider reference as their identity and build temporary metadata in memory; they do not import a library track. Lyrics follow the audio engine's position, including seeks and pauses, and use the existing configured providers. YouTube covers have a public thumbnail fallback even for restored queue entries without a thumbnail. Visible streams can discover higher-quality catalog artwork through the existing artwork provider. When the YouTube extractor supplies musical track, artist or album fields, playback updates the queue metadata before publishing the ready state to improve resource matching.
+
 The native audio worker opens remote references through `network_audio.rs`. A separate thread resolves credentials and short-lived URLs, receives HTTP data and decodes it. The device callback consumes decoded samples; it never waits for HTTP or runs an extractor. The existing processing chain still applies equalization, balance, volume and limiting.
 
 ## Buffer and seeking

@@ -62,11 +62,13 @@ export function loadArtwork(
   const task = async () => {
     const resolvedId =
       trackId ||
-      (path
-        ? (await libraryAction({ kind: "snapshot" })).tracks.find(
-            (track) => track.local_path === path,
-          )?.id
-        : null);
+      (path?.startsWith("zenith-source:")
+        ? path
+        : path
+          ? (await libraryAction({ kind: "snapshot" })).tracks.find(
+              (track) => track.local_path === path,
+            )?.id
+          : null);
     const snapshot = resolvedId
       ? await artworkAction(resolvedId, { kind: "snapshot" })
       : emptyArtwork;

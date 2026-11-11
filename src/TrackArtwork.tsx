@@ -66,6 +66,18 @@ export const TrackArtwork = memo(function TrackArtwork({
   const video = useRef<HTMLVideoElement>(null);
   const refreshedAt = useRef(0);
   const active = animate && !paused && appVisible && visible && !reduced;
+  const sourceReference = [path, trackId].find((value) =>
+    value?.startsWith("zenith-source:"),
+  );
+  const youtubeId = sourceReference?.match(
+    /^zenith-source:(?:youtube|youtube-auto):([A-Za-z0-9_-]{11})$/,
+  )?.[1];
+  const sourcePoster =
+    thumbnail ||
+    (youtubeId
+      ? `https://i.ytimg.com/vi/${youtubeId}/hqdefault.jpg`
+      : undefined);
+  const discover = active || (!!sourceReference && nearby && appVisible);
   const motionUrl = asset?.motion_url;
   const videoKey = JSON.stringify([identity, resourceIdentity, motionUrl]);
   const showVideo =
@@ -150,7 +162,7 @@ export const TrackArtwork = memo(function TrackArtwork({
   ]);
 
   useEffect(() => {
-    if (!active || !resourceTrack) return;
+    if (!discover || !resourceTrack) return;
     let cancelled = false;
     void discoverArtwork(resourceTrack, resourceIdentity).catch((error) => {
       if (!cancelled) setNotice({ key: identity, text: String(error) });
@@ -158,7 +170,7 @@ export const TrackArtwork = memo(function TrackArtwork({
     return () => {
       cancelled = true;
     };
-  }, [active, resourceTrack, resourceIdentity, identity]);
+  }, [discover, resourceTrack, resourceIdentity, identity]);
 
   useEffect(() => {
     const element = video.current;
@@ -237,7 +249,7 @@ export const TrackArtwork = memo(function TrackArtwork({
     return () => window.clearTimeout(timer);
   }, [active, currentFrames, gifKey]);
 
-  const poster = data?.poster || thumbnail;
+  const poster = data?.poster || sourcePoster;
   const image =
     active && currentFrames
       ? (currentFrames.items[currentFrames.index]?.url ?? poster)

@@ -443,6 +443,11 @@ pub fn execute(
             .find(|t| t.id == track_id)
             .ok_or("Selecciona una canción de la biblioteca")?
     };
+    execute_for_track(storage, track, action)
+}
+
+fn execute_for_track(storage: &StorageManager, track: TrackEntry, action: Action) -> Result<Snapshot, String> {
+    let track_id = track.id.clone();
     let mut candidates = Vec::new();
     let mut warnings = Vec::new();
     match &action {
@@ -583,7 +588,12 @@ pub async fn lyrics_action(
 ) -> Result<Snapshot, String> {
     use tauri::Manager;
     tauri::async_runtime::spawn_blocking(move || {
-        execute(&app.state::<StorageManager>(), track_id, action)
+        if crate::sources::is_stream_reference(&track_id) {
+            let track = crate::playback_resources::stream_track(&app, &track_id)?;
+            execute_for_track(&app.state::<StorageManager>(), track, action)
+        } else {
+            execute(&app.state::<StorageManager>(), track_id, action)
+        }
     })
     .await
     .map_err(|e| e.to_string())?

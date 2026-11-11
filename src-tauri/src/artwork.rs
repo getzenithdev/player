@@ -744,6 +744,11 @@ pub fn execute(s: &StorageManager, track_id: String, action: Action) -> Result<S
             .find(|t| t.id == track_id)
             .ok_or("Selecciona una canción de la biblioteca")?
     };
+    execute_for_track(s, track, action)
+}
+
+fn execute_for_track(s: &StorageManager, track: TrackEntry, action: Action) -> Result<Snapshot, String> {
+    let track_id = track.id.clone();
     let mut assets = Vec::new();
     let mut search = None;
     let mut warnings = Vec::new();
@@ -971,7 +976,12 @@ pub async fn artwork_action(
             action,
             Action::Snapshot | Action::Search { .. } | Action::Export { .. }
         );
-        let snapshot = execute(&app.state::<StorageManager>(), track_id, action)?;
+        let snapshot = if crate::sources::is_stream_reference(&track_id) {
+            let track = crate::playback_resources::stream_track(&app, &track_id)?;
+            execute_for_track(&app.state::<StorageManager>(), track, action)?
+        } else {
+            execute(&app.state::<StorageManager>(), track_id, action)?
+        };
         if changed {
             let _ = app.emit("artwork:changed", ());
         }

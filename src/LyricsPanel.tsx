@@ -22,6 +22,8 @@ import {
 import { useResourceTrack } from "./ResourceTrack";
 import "./Resources.css";
 import { TrackArtwork } from "./TrackArtwork";
+import { entryFromTrack } from "./playlists";
+import { sourceFromPlayback, sourceLibraryTrack } from "./sources";
 
 const LyricWords = memo(function LyricWords({
   words,
@@ -136,10 +138,15 @@ export function Lyrics({
     [loadedTrackId, trackId, snapshot],
   );
   const preferences = snapshot.preferences;
+  const playingSource = audio.state.track
+    ? sourceFromPlayback(audio.state.track)
+    : null;
   const isPlayingTrack =
     !!track &&
     (audio.state.track?.trackId === track.id ||
-      audio.state.track?.path === track.local_path);
+      audio.state.track?.path === entryFromTrack(track).path ||
+      audio.state.track?.path === track.local_path ||
+      (!!playingSource && !!sourceLibraryTrack([track], playingSource)));
   const position = isPlayingTrack ? audio.state.positionMs : 0;
   const canSeek =
     audio.available &&

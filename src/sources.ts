@@ -1,6 +1,6 @@
 import { invoke } from "@tauri-apps/api/core";
 import { libraryAction, type LibraryTrack } from "./library";
-import { entryFromPath, entryFromTrack } from "./playlists";
+import { entryFromPath, entryFromTrack, type MediaEntry } from "./playlists";
 
 export type ProviderId =
   | "local"
@@ -164,6 +164,38 @@ export function sourceFromPlayback(track: {
   } catch {
     return null;
   }
+}
+
+/** Resource-only metadata for the current stream; never a library insertion. */
+export function playbackResourceTrack(
+  entry: MediaEntry,
+): LibraryTrack | undefined {
+  const source = sourceFromPlayback(entry);
+  if (!source) return undefined;
+  return {
+    id: entry.path,
+    source: source.provider,
+    source_id: source.id,
+    title: entry.title,
+    artist: entry.artist,
+    album: entry.album,
+    album_artist: null,
+    genre: null,
+    year: null,
+    track_number: null,
+    disc_number: null,
+    comments: null,
+    local_path: null,
+    duration: entry.durationMs === null ? null : entry.durationMs / 1000,
+    artwork_id: null,
+    format: entry.format,
+    size: 0,
+    added_at: 0,
+    missing: false,
+    favorite: false,
+    play_count: 0,
+    last_played: null,
+  };
 }
 
 /** Prefer the configured API for YouTube search, avoiding duplicate catalogs. */

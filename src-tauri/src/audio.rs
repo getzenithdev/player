@@ -1080,6 +1080,11 @@ impl AudioWorker {
         if let Some(index) = self.current {
             self.queue[index].duration_ms = info.duration.map(duration_ms);
             self.queue[index].format = self.format.clone().unwrap_or_default();
+            if let Some(metadata) = info.metadata {
+                if let Some(title) = metadata.title { self.queue[index].title = title; }
+                if let Some(artist) = metadata.artist { self.queue[index].artist = Some(artist); }
+                if let Some(album) = metadata.album { self.queue[index].album = Some(album); }
+            }
             if self.visit.is_none() { self.visit = Some(Visit::new(self.queue[index].clone())); }
         }
         self.publish();
