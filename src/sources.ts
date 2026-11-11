@@ -74,7 +74,9 @@ export const sourcesAction = (action: object): Promise<SourcesSnapshot> =>
 
 export async function preparedSourceEntry(path: string, source: SourceEntry) {
   const library = await libraryAction({ kind: "snapshot" });
-  const track = library.tracks.find((track) => track.local_path === path);
+  const track = path.startsWith("zenith-source:")
+    ? sourceLibraryTrack(library.tracks, source)
+    : library.tracks.find((track) => track.local_path === path);
   return track
     ? entryFromTrack(track)
     : {
@@ -102,7 +104,7 @@ export function sourceLibraryTrack(tracks: LibraryTrack[], entry: SourceEntry) {
   );
 }
 
-/** Prepare a playable local copy before saving an external result as a favorite. */
+/** Remember provider metadata before saving a result as a favorite. No media download. */
 export async function favoriteSource(
   entry: SourceEntry,
   tracks: LibraryTrack[],
@@ -117,9 +119,7 @@ export async function favoriteSource(
     if (!prepared.downloaded)
       throw new Error("No se pudo preparar el audio para favoritos");
     const snapshot = await libraryAction({ kind: "snapshot" });
-    track = snapshot.tracks.find(
-      (item) => item.local_path === prepared.downloaded,
-    );
+    track = sourceLibraryTrack(snapshot.tracks, entry);
     if (!track) throw new Error("No se encontró el audio en la biblioteca");
   }
   return libraryAction({

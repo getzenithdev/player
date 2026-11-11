@@ -23,12 +23,35 @@ export function PlayerBar({
   const playback = audio.state;
   const track = playback.track;
   const hasQueue = playback.queue.length > 0;
-  const isPlaying = playback.status === "playing";
+  const isPlaying =
+    playback.status === "playing" ||
+    (playback.status === "loading" && playback.playWhenReady !== false);
   const canSeek =
     !!playback.durationMs && ["playing", "paused"].includes(playback.status);
   const seekMax = Math.max(playback.durationMs ?? 0, 1);
   const [seekValue, setSeekValue] = useState(0);
   const [seeking, setSeeking] = useState(false);
+  const progress = Math.max(
+    0,
+    Math.min(
+      100,
+      ((seeking ? seekValue : playback.positionMs) / seekMax) * 100,
+    ),
+  );
+  const bufferedBackground =
+    (playback.bufferedRanges ?? [])
+      .map((range) => {
+        const start = Math.max(
+          0,
+          Math.min(100, (range.startMs / seekMax) * 100),
+        );
+        const end = Math.max(
+          start,
+          Math.min(100, (range.endMs / seekMax) * 100),
+        );
+        return `linear-gradient(90deg, transparent ${start}%, var(--buffered-audio) ${start}%, var(--buffered-audio) ${end}%, transparent ${end}%)`;
+      })
+      .join(", ") || "linear-gradient(transparent, transparent)";
   function cycleRepeat() {
     const modes = ["off", "all", "one"] as const;
     void audio.setRepeat(
@@ -86,20 +109,30 @@ export function PlayerBar({
               <strong>{track?.title ?? "Sin reproducción"}</strong>
             </button>
           )}
-          <span>
-            {expanded && current
-              ? (current.artist ?? track?.artist ?? "Artista desconocido")
-              : track
-                ? [
-                    track.format,
-                    current?.artist ?? track.artist ?? "Archivo de audio",
-                    current?.album ?? track.album,
-                  ]
-                    .filter(Boolean)
-                    .join(" · ")
-                : audio.available
-                  ? "Elige una canción"
-                  : "Elige una canción"}
+          <span
+            role={
+              playback.buffering || playback.status === "loading"
+                ? "status"
+                : undefined
+            }
+          >
+            {playback.status === "loading"
+              ? "Conectando audio…"
+              : playback.buffering && playback.status === "playing"
+                ? "Almacenando en búfer…"
+                : expanded && current
+                  ? (current.artist ?? track?.artist ?? "Artista desconocido")
+                  : track
+                    ? [
+                        track.format,
+                        current?.artist ?? track.artist ?? "Archivo de audio",
+                        current?.album ?? track.album,
+                      ]
+                        .filter(Boolean)
+                        .join(" · ")
+                    : audio.available
+                      ? "Elige una canción"
+                      : "Elige una canción"}
           </span>
         </div>
         <button
@@ -149,11 +182,13 @@ export function PlayerBar({
           <input
             style={
               {
-                "--progress": `${(playback.positionMs / seekMax) * 100}%`,
+                "--progress": `${progress}%`,
+                "--buffered-ranges": bufferedBackground,
               } as CSSProperties
             }
             type="range"
             aria-label="Posición de reproducción"
+            aria-valuetext={`${formatTime(seeking ? seekValue : playback.positionMs)} de ${formatTime(playback.durationMs)}${playback.buffering ? ", almacenando en búfer" : ""}`}
             min="0"
             max={seekMax}
             step="1"
@@ -192,30 +227,30 @@ export function PlayerBar({
       </div>
       <div className="player-tools">
         <div className="volume-control">
-        <button
-          className="icon-button"
-          disabled={!audio.available}
-          aria-label={playback.muted ? "Activar sonido" : "Silenciar"}
-          title={playback.muted ? "Activar sonido" : "Silenciar"}
-          onClick={() => void audio.setMuted(!playback.muted)}
-        >
-          <Icon name={playback.muted ? "volumeOff" : "volume"} size={18} />
-        </button>
-        <div className="volume-slider">
-        <input
-          type="range"
-          aria-label="Volumen"
-          min="0"
-          max="100"
-          value={Math.round((playback.muted ? 0 : playback.volume) * 100)}
-          disabled={!audio.available}
-          onChange={(event) => {
-            const volume = Number(event.target.value) / 100;
-            if (playback.muted) void audio.setMuted(false);
-            void audio.setVolume(volume);
-          }}
-        />
-        </div>
+          <button
+            className="icon-button"
+            disabled={!audio.available}
+            aria-label={playback.muted ? "Activar sonido" : "Silenciar"}
+            title={playback.muted ? "Activar sonido" : "Silenciar"}
+            onClick={() => void audio.setMuted(!playback.muted)}
+          >
+            <Icon name={playback.muted ? "volumeOff" : "volume"} size={18} />
+          </button>
+          <div className="volume-slider">
+            <input
+              type="range"
+              aria-label="Volumen"
+              min="0"
+              max="100"
+              value={Math.round((playback.muted ? 0 : playback.volume) * 100)}
+              disabled={!audio.available}
+              onChange={(event) => {
+                const volume = Number(event.target.value) / 100;
+                if (playback.muted) void audio.setMuted(false);
+                void audio.setVolume(volume);
+              }}
+            />
+          </div>
         </div>
         <button
           className={`icon-button ${playback.shuffle ? "active" : ""}`}

@@ -82,7 +82,7 @@ export function ExternalSearchResults({
         </p>
       ))}
       {error && <p role="alert">{error}</p>}
-      {busy && <p role="status">Preparando audio…</p>}
+      {busy && <p role="status">Conectando con el servicio…</p>}
       <ul className="resource-results">
         {result?.results.map((entry) => {
           const provider = result.providers.find(

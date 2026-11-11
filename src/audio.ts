@@ -12,6 +12,11 @@ export type RepeatMode = "off" | "all" | "one";
 
 export type TrackSummary = MediaEntry;
 
+export interface BufferedRange {
+  startMs: number;
+  endMs: number;
+}
+
 export interface PlaybackSnapshot {
   status: PlaybackStatus;
   track: TrackSummary | null;
@@ -30,6 +35,9 @@ export interface PlaybackSnapshot {
   outputSampleRate: number | null;
   outputChannels: number | null;
   processing: ProcessingSnapshot;
+  bufferedRanges?: BufferedRange[];
+  buffering?: boolean;
+  playWhenReady?: boolean;
 }
 
 export interface AudioCapabilities {
@@ -43,6 +51,8 @@ interface PositionEvent {
   positionMs: number;
   durationMs: number | null;
   status: PlaybackStatus;
+  bufferedRanges: BufferedRange[];
+  buffering: boolean;
 }
 
 export const emptySnapshot: PlaybackSnapshot = {
@@ -63,6 +73,8 @@ export const emptySnapshot: PlaybackSnapshot = {
   outputSampleRate: null,
   outputChannels: null,
   processing: defaultProcessing,
+  bufferedRanges: [],
+  buffering: false,
 };
 
 function isTauriRuntime(): boolean {
@@ -150,13 +162,13 @@ export function useAudioEngine() {
               const { positionMs } = event.payload;
               const durationMs =
                 event.payload.durationMs ?? previous.durationMs;
-              if (
-                previous.positionMs === positionMs &&
-                previous.durationMs === durationMs
-              ) {
-                return previous;
-              }
-              return { ...previous, positionMs, durationMs };
+              return {
+                ...previous,
+                positionMs,
+                durationMs,
+                bufferedRanges: event.payload.bufferedRanges,
+                buffering: event.payload.buffering,
+              };
             });
           }),
         );

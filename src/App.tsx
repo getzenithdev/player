@@ -71,7 +71,8 @@ export default function App() {
     [],
   );
   const [restoredLibraryView, setRestoredLibraryView] = useState<LibraryView>();
-  const activeCollection = collectionHistory.at(-1)?.collection;
+  const activeCollection =
+    collectionHistory[collectionHistory.length - 1]?.collection;
   const isCollectionPage = view === "albumDetail" || view === "artistDetail";
   const [collectionBackground, setCollectionBackground] =
     useState<HTMLDivElement | null>(null);
@@ -173,7 +174,7 @@ export default function App() {
     pendingScroll.current = 0;
   }
   function backFromCollection() {
-    const visit = collectionHistory.at(-1);
+    const visit = collectionHistory[collectionHistory.length - 1];
     if (!visit) return;
     setCollectionHistory((history) => history.slice(0, -1));
     setView(visit.origin.view);

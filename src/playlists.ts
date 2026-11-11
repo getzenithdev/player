@@ -51,7 +51,11 @@ export function entryFromTrack(t: LibraryTrack): MediaEntry {
   return {
     id: "",
     trackId: t.id,
-    path: t.local_path ?? "",
+    path:
+      t.local_path ??
+      (t.source && t.source_id
+        ? `zenith-source:${t.source}:${encodeURIComponent(t.source_id)}`
+        : ""),
     title: t.title,
     artist: t.artist,
     album: t.album,

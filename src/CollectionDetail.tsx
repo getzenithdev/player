@@ -11,6 +11,7 @@ import { Icon } from "./Icon";
 import { artistName, groupIdentity, type LibraryTrack } from "./library";
 import "./CollectionDetail.css";
 import { DeleteCollectionDialog } from "./DeleteCollectionDialog";
+import { isPlayableTrack } from "./musicViews";
 
 export function CollectionDetail({
   kind,
@@ -129,9 +130,7 @@ export function CollectionDetail({
             <button
               className="button primary"
               onClick={onPlay}
-              disabled={
-                !tracks.some((track) => track.local_path && !track.missing)
-              }
+              disabled={!tracks.some(isPlayableTrack)}
             >
               <Icon name="play" size={18} /> Reproducir
             </button>

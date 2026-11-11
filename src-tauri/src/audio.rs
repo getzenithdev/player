@@ -19,6 +19,7 @@ use std::{
 
 use rodio::{Decoder, DeviceSinkBuilder, MixerDeviceSink, Player, Source};
 use serde::{Deserialize, Serialize};
+use crate::network_audio::{BufferedRange, StreamSession};
 use tauri::{AppHandle, Emitter, Manager, State};
 
 const STATE_EVENT: &str = "audio:state";
@@ -97,6 +98,9 @@ pub struct PlaybackSnapshot {
     pub output_sample_rate: Option<u32>,
     pub output_channels: Option<u16>,
     pub processing: ProcessingSnapshot,
+    pub buffered_ranges: Vec<BufferedRange>,
+    pub buffering: bool,
+    pub play_when_ready: bool,
 }
 
 impl Default for PlaybackSnapshot {
@@ -119,6 +123,9 @@ impl Default for PlaybackSnapshot {
             output_sample_rate: None,
             output_channels: None,
             processing: ProcessingSnapshot::default(),
+            buffered_ranges: Vec::new(),
+            buffering: false,
+            play_when_ready: false,
         }
     }
 }
@@ -129,6 +136,8 @@ pub struct PositionEvent {
     position_ms: u64,
     duration_ms: Option<u64>,
     status: PlaybackStatus,
+    buffered_ranges: Vec<BufferedRange>,
+    buffering: bool,
 }
 
 #[derive(Clone, Debug, Serialize)]
@@ -367,6 +376,8 @@ struct AudioWorker {
     writer: PersistenceWriter,
     last_checkpoint: std::time::Instant,
     processing: Arc<ProcessingShared>,
+    stream: Option<StreamSession>,
+    stream_autoplay: bool,
 }
 
 impl AudioWorker {
@@ -408,6 +419,8 @@ impl AudioWorker {
             writer,
             last_checkpoint: std::time::Instant::now(),
             processing,
+            stream: None,
+            stream_autoplay: true,
         }
     }
 
@@ -463,6 +476,7 @@ impl AudioWorker {
             AudioCommand::Pause => self.pause(),
             AudioCommand::Toggle => match self.status {
                 PlaybackStatus::Playing => self.pause(),
+                PlaybackStatus::Loading if self.stream_autoplay => self.pause(),
                 _ => self.resume(),
             },
             AudioCommand::Stop => self.stop(),
@@ -691,7 +705,7 @@ impl AudioWorker {
         self.error = None;
         self.recoveries = 0;
 
-        if play && let Some(index) = self.queue.iter().position(|e| Path::new(&e.path).is_file()) {
+        if play && let Some(index) = self.queue.iter().position(|e| playlists::playable_path(&e.path)) {
             self.start_index(index, true, None);
         } else {
             self.status = PlaybackStatus::Idle;
@@ -717,6 +731,7 @@ impl AudioWorker {
     }
 
     fn clear_player(&mut self) {
+        self.stream = None;
         if let Some(player) = &self.player {
             player.stop();
         }
@@ -734,6 +749,7 @@ impl AudioWorker {
         }
 
         self.persist(false);
+        self.clear_player();
         self.restored = false;
         if start_at.is_none() {
             self.visit = None;
@@ -776,6 +792,21 @@ impl AudioWorker {
             .ok_or_else(|| "No hay una salida de audio disponible.".to_string())?;
 
         player.stop();
+        self.stream = None;
+        if crate::sources::is_stream_reference(&path) {
+            let app = self.app.clone();
+            let reference = path.clone();
+            self.stream = Some(StreamSession::start(
+                Arc::new(move |cancel| crate::sources::resolve_stream(&app, &reference, cancel)),
+                start_at.unwrap_or_default(),
+            )?);
+            self.stream_autoplay = autoplay;
+            self.status = PlaybackStatus::Loading;
+            self.position = start_at.unwrap_or_default();
+            self.current = Some(index);
+            self.publish();
+            return Ok(());
+        }
         let (decoder, info) = decode_file(Path::new(&path))?;
         let track_gain = audio_processing::read_track_gain(Path::new(&path));
         self.processing.set_track_gain(track_gain);
@@ -853,13 +884,13 @@ impl AudioWorker {
                 self.status = PlaybackStatus::Playing;
                 self.publish();
             }
-            PlaybackStatus::Loading => {}
+            PlaybackStatus::Loading => { self.stream_autoplay = true; self.publish(); }
             PlaybackStatus::Error if self.player.is_none() => self.restart_output(),
             PlaybackStatus::Stopped | PlaybackStatus::Idle | PlaybackStatus::Error => {
                 if let Some(index) = self.current {
                     self.start_index(index, true, None);
                 } else if let Some(index) =
-                    self.queue.iter().position(|e| Path::new(&e.path).is_file())
+                    self.queue.iter().position(|e| playlists::playable_path(&e.path))
                 {
                     self.start_index(index, true, None);
                 } else {
@@ -871,6 +902,11 @@ impl AudioWorker {
     }
 
     fn pause(&mut self) {
+        if self.status == PlaybackStatus::Loading && self.stream.is_some() {
+            self.stream_autoplay = false;
+            self.publish();
+            return;
+        }
         if self.status == PlaybackStatus::Playing {
             if let Some(player) = &self.player {
                 player.pause();
@@ -881,6 +917,7 @@ impl AudioWorker {
     }
 
     fn stop(&mut self) {
+        self.stream = None;
         if let Some(player) = &self.player {
             player.stop();
         }
@@ -912,6 +949,14 @@ impl AudioWorker {
             .duration
             .map_or(position, |duration| position.min(duration));
 
+        if let Some(stream) = &self.stream {
+            stream.seek(target);
+            self.listen_position = target;
+            self.stalled_ticks = 0;
+            self.publish();
+            return;
+        }
+
         match player.try_seek(target) {
             Ok(()) => {
                 self.position = target;
@@ -933,7 +978,7 @@ impl AudioWorker {
             .queue
             .iter()
             .enumerate()
-            .filter(|(_, e)| Path::new(&e.path).is_file())
+            .filter(|(_, e)| playlists::playable_path(&e.path))
             .map(|(i, _)| i)
             .collect();
         session::available_index(
@@ -949,7 +994,7 @@ impl AudioWorker {
 
     fn next_manual(&mut self) {
         let Some(current) = self.current else {
-            if let Some(index) = self.queue.iter().position(|e| Path::new(&e.path).is_file()) {
+            if let Some(index) = self.queue.iter().position(|e| playlists::playable_path(&e.path)) {
                 self.start_index(index, true, None);
             }
             return;
@@ -968,7 +1013,7 @@ impl AudioWorker {
         }
 
         let Some(current) = self.current else {
-            if let Some(index) = self.queue.iter().position(|e| Path::new(&e.path).is_file()) {
+            if let Some(index) = self.queue.iter().position(|e| playlists::playable_path(&e.path)) {
                 self.start_index(index, true, None);
             }
             return;
@@ -986,7 +1031,7 @@ impl AudioWorker {
             return;
         };
 
-        if self.repeat == RepeatMode::One && Path::new(&self.queue[current].path).is_file() {
+        if self.repeat == RepeatMode::One && playlists::playable_path(&self.queue[current].path) {
             self.start_index(current, true, None);
             return;
         }
@@ -995,6 +1040,7 @@ impl AudioWorker {
             Some(index) => self.start_index(index, true, None),
             None => {
                 self.status = PlaybackStatus::Stopped;
+                self.stream = None;
                 self.position = self.duration.unwrap_or_default();
                 self.last_position = self.position;
                 self.stalled_ticks = 0;
@@ -1003,7 +1049,44 @@ impl AudioWorker {
         }
     }
 
+    /// Attach only once decoded samples are ready; the command worker remains
+    /// responsive to stop/next/pause while DNS, authentication and buffering run.
+    fn poll_stream(&mut self) {
+        let Some(stream) = &mut self.stream else { return; };
+        let snapshot = stream.snapshot();
+        if let Some(error) = snapshot.error {
+            self.stream = None;
+            if let Some(player) = &self.player { player.stop(); }
+            self.set_error(error);
+            return;
+        }
+        let Some(source) = stream.take_source() else { return; };
+        let Some(info) = snapshot.info else { return; };
+        let Some(player) = &self.player else { return; };
+        self.processing.set_track_gain(Default::default());
+        self.processing.set_sample_rate(Some(info.sample_rate));
+        self.processing.reset_limiter();
+        player.set_volume(self.effective_volume());
+        player.append(ProcessingSource::new(source, Arc::clone(&self.processing), info.duration));
+        if self.stream_autoplay { player.play(); } else { player.pause(); }
+        self.status = if self.stream_autoplay { PlaybackStatus::Playing } else { PlaybackStatus::Paused };
+        self.duration = info.duration;
+        self.sample_rate = Some(info.sample_rate);
+        self.channels = Some(info.channels);
+        self.format = Some(info.format);
+        self.position = snapshot.position;
+        self.last_position = snapshot.position;
+        self.listen_position = snapshot.position;
+        if let Some(index) = self.current {
+            self.queue[index].duration_ms = info.duration.map(duration_ms);
+            self.queue[index].format = self.format.clone().unwrap_or_default();
+            if self.visit.is_none() { self.visit = Some(Visit::new(self.queue[index].clone())); }
+        }
+        self.publish();
+    }
+
     fn tick(&mut self) {
+        self.poll_stream();
         if !matches!(
             self.status,
             PlaybackStatus::Playing | PlaybackStatus::Paused
@@ -1016,7 +1099,10 @@ impl AudioWorker {
             None => return,
         };
 
-        let position = if empty {
+        let stream_state = self.stream.as_ref().map(StreamSession::snapshot);
+        let position = if let Some(state) = &stream_state {
+            state.position
+        } else if empty {
             self.duration.unwrap_or(position)
         } else {
             position
@@ -1047,22 +1133,27 @@ impl AudioWorker {
             self.duration.map(duration_ms),
         );
 
-        if self.status != PlaybackStatus::Playing {
-            return;
-        }
-
-        if empty {
+        if empty && self.status == PlaybackStatus::Playing {
             self.advance_after_end();
             return;
         }
 
-        self.detect_stall(position, paused);
+        if self.status == PlaybackStatus::Playing && !stream_state.as_ref().is_some_and(|state| state.buffering) {
+            self.detect_stall(position, paused);
+        }
 
         let payload = PositionEvent {
             position_ms: duration_ms(position),
             duration_ms: self.duration.map(duration_ms),
             status: self.status.clone(),
+            buffered_ranges: stream_state.as_ref().map(|state| state.ranges.clone()).unwrap_or_default(),
+            buffering: stream_state.as_ref().is_some_and(|state| state.buffering),
         };
+        if let Ok(mut shared) = self.shared.lock() {
+            shared.position_ms = payload.position_ms;
+            shared.buffered_ranges = payload.buffered_ranges.clone();
+            shared.buffering = payload.buffering;
+        }
         let _ = self.app.emit(POSITION_EVENT, payload);
     }
 
@@ -1143,6 +1234,7 @@ impl AudioWorker {
         if self.status != PlaybackStatus::Loading {
             self.persist(false);
         }
+        let stream_state = self.stream.as_ref().map(StreamSession::snapshot);
         let snapshot = PlaybackSnapshot {
             status: self.status.clone(),
             track: self
@@ -1163,6 +1255,9 @@ impl AudioWorker {
             output_sample_rate: self.output_sample_rate,
             output_channels: self.output_channels,
             processing: self.processing.snapshot(),
+            buffered_ranges: stream_state.as_ref().map(|state| state.ranges.clone()).unwrap_or_default(),
+            buffering: stream_state.as_ref().is_some_and(|state| state.buffering),
+            play_when_ready: self.stream.is_some() && self.stream_autoplay,
         };
 
         if let Ok(mut shared) = self.shared.lock() {

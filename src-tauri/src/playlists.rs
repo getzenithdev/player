@@ -133,6 +133,7 @@ pub fn library_tracks(storage: &StorageManager) -> Result<TracksDocument, String
 }
 pub fn resolve_entries(entries: &mut [Entry], library: &TracksDocument) {
     for entry in entries {
+        let source = crate::sources::parse_stream_reference(&entry.path);
         if let Some(t) = library
             .tracks
             .iter()
@@ -143,9 +144,15 @@ pub fn resolve_entries(entries: &mut [Entry], library: &TracksDocument) {
                     .iter()
                     .find(|t| t.local_path.as_ref() == Some(&entry.path))
             })
-            && let Some(path) = &t.local_path
+            .or_else(|| source.as_ref().and_then(|(provider, id)| library.tracks.iter().find(|t|
+                t.source.as_deref() == Some(provider.key()) && t.source_id.as_ref() == Some(id))))
         {
-            entry.path = path.clone();
+            if let Some(path) = &t.local_path {
+                entry.path = path.clone();
+            } else if let (Some(provider), Some(id)) = (&t.source, &t.source_id) {
+                let reference = crate::sources::stream_reference(provider, id);
+                if crate::sources::is_stream_reference(&reference) { entry.path = reference; }
+            }
             entry.track_id = Some(t.id.clone());
             entry.title = t.title.clone();
             entry.artist = t.artist.clone();
@@ -153,8 +160,11 @@ pub fn resolve_entries(entries: &mut [Entry], library: &TracksDocument) {
             entry.duration_ms = t.duration.map(|s| s.saturating_mul(1000));
             entry.format = t.format.clone();
         }
-        entry.available = Path::new(&entry.path).is_file();
+        entry.available = playable_path(&entry.path);
     }
+}
+pub fn playable_path(path: &str) -> bool {
+    crate::sources::is_stream_reference(path) || Path::new(path).is_file()
 }
 fn validate_name(name: &str) -> Result<String, String> {
     let name = name.trim();
@@ -174,8 +184,9 @@ pub fn validate_entries(entries: &[Entry]) -> Result<(), String> {
             || e.path.contains(['\r', '\n', '\0'])
             || e.title.len() > 16384
             || e.path.contains("://")
+            || (e.path.starts_with("zenith-source:") && !crate::sources::is_stream_reference(&e.path))
         {
-            return Err("Solo se admiten rutas locales válidas".into());
+            return Err("Solo se admiten archivos locales o referencias de servicios válidas".into());
         }
     }
     Ok(())
@@ -313,6 +324,7 @@ struct Exchange {
     entries: Vec<Entry>,
 }
 fn normalize_path(base: &Path, value: &str) -> String {
+    if crate::sources::is_stream_reference(value) { return value.into(); }
     // Preserve foreign absolute paths (e.g. a Windows playlist on macOS).
     if value.as_bytes().get(1) == Some(&b':') || value.starts_with("\\\\") {
         return value.into();

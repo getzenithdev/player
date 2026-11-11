@@ -116,6 +116,13 @@ fn run(
     generation: u64,
     download: Option<&Path>,
 ) -> Result<Vec<u8>, String> {
+    run_cancellable(command, timeout, generation, download, None)
+}
+
+fn run_cancellable(
+    command: &mut Command, timeout: Duration, generation: u64,
+    download: Option<&Path>, cancel: Option<&AtomicBool>,
+) -> Result<Vec<u8>, String> {
     #[cfg(unix)]
     {
         use std::os::unix::process::CommandExt;
@@ -131,7 +138,7 @@ fn run(
         let err = scope.spawn(|| capture(stderr, 64 * 1024, &overflow));
         let start = Instant::now();
         let result = loop {
-            let failure = if GENERATION.load(Ordering::Relaxed) != generation {
+            let failure = if GENERATION.load(Ordering::Relaxed) != generation || cancel.is_some_and(|flag| flag.load(Ordering::Acquire)) {
                 Some("Operación de YouTube cancelada")
             } else if start.elapsed() >= timeout {
                 Some("YouTube tardó demasiado; inténtalo de nuevo")
@@ -288,6 +295,35 @@ pub(super) fn download(storage: &StorageManager, tools: &Path, id: &str) -> Resu
     }
     fs::rename(&audio, &target).map_err(|_| "No se pudo guardar el audio en caché")?;
     Ok(target.to_string_lossy().into_owned())
+}
+
+/// Resolve a native AAC HTTP resource without downloading its body. Exclude
+/// segmented manifests: this reader supports byte ranges, not HLS/DASH manifests.
+pub(super) fn resolve_stream(tools: &Path, id: &str, cancel: &AtomicBool) -> Result<crate::network_audio::RemoteAudio, String> {
+    let id = video_id(id)?;
+    let waiting = Instant::now();
+    let _job = loop {
+        if cancel.load(Ordering::Acquire) { return Err("Streaming cancelado".into()); }
+        match JOB.try_lock() {
+            Ok(job) => break job,
+            Err(std::sync::TryLockError::Poisoned(_)) => return Err("No se pudo consultar YouTube".into()),
+            Err(_) if waiting.elapsed() < SEARCH_TIMEOUT => std::thread::sleep(Duration::from_millis(25)),
+            Err(_) => return Err("YouTube está ocupado; vuelve a intentarlo".into()),
+        }
+    };
+    let generation = GENERATION.load(Ordering::Relaxed);
+    let mut command = command(tools)?;
+    command.args(["--format", "bestaudio[ext=m4a][acodec^=mp4a][protocol=https]", "--dump-single-json", "--skip-download",
+        "--match-filters", "!is_live & !is_upcoming", "--"])
+        .arg(format!("https://www.youtube.com/watch?v={id}"));
+    let raw = run_cancellable(&mut command, SEARCH_TIMEOUT, generation, None, Some(cancel))?;
+    let value: serde_json::Value = serde_json::from_slice(&raw).map_err(|_| "YouTube entregó una respuesta de audio inválida")?;
+    let url = value.get("url").and_then(|v| v.as_str()).ok_or("YouTube no ofreció audio HTTP compatible")?.to_string();
+    super::secure_url(&url)?;
+    let headers = value.get("http_headers").and_then(|v| v.as_object()).map(|values| {
+        values.iter().filter_map(|(key, value)| value.as_str().map(|v| (key.clone(), v.to_string()))).collect()
+    }).unwrap_or_default();
+    Ok(crate::network_audio::RemoteAudio { url, headers, hint: Some("m4a".into()) })
 }
 
 fn valid_audio(path: &Path) -> bool {

@@ -23,13 +23,13 @@ disabled the action remains disabled; local search is still selectable.
 
 - Flat searches return up to 25 video IDs, titles and channels without resolving
   every result's media formats. Live results are excluded when marked as live.
-- Playback downloads a compatible AAC/M4A audio stream to a unique temporary
-  directory inside `cache/audio/`, validates a decoded sample with the same decoder used for playback, then promotes the completed file to
+- Explicit downloads obtain a compatible AAC/M4A audio stream in a unique temporary
+  directory inside `cache/audio/`, validate a decoded sample with the same decoder used for playback, then promote the completed file to
   `youtube-<video-id>.m4a`. The existing Rodio/Symphonia MP4 decoder handles it.
-- Playback starts **after preparation**, not while downloading. There is no
-  progressive streaming, automatic YouTube queue prefetch or audio transcoding
+- Playback resolves a direct HTTPS AAC/M4A URL without downloading the entire resource, then streams through the native bounded buffer. See [Progressive external audio](streaming.md). There is no
+  automatic YouTube queue prefetch or audio transcoding
   in this implementation. FFmpeg and Opus decoding are not required.
-- Valid cached files are reused without contacting YouTube. Temporary files are
+- Explicit downloads reuse valid cached files without contacting YouTube. Temporary files are
   removed on failure and cancellation; a completed cache file survives restart.
 - Only exact 11-character video IDs are accepted, not arbitrary URLs or paths.
   Files are limited to 128 MiB; stdout to 4 MiB and stderr to 64 KiB. Deadlines

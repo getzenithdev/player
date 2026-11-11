@@ -9,6 +9,7 @@ import {
   albumGroups,
   formatTime,
   playableTracks,
+  isPlayableTrack,
   searchMusic,
 } from "./musicViews";
 import { entryFromTrack, usePlaylists } from "./playlists";
@@ -225,7 +226,7 @@ function SongResults({
         <div className="discovery-song-row" key={t.id}>
           <button
             className={`discovery-song ${audio.state.track?.trackId === t.id ? "current" : ""}`}
-            disabled={!audio.available || !t.local_path || t.missing}
+            disabled={!audio.available || !isPlayableTrack(t)}
             onClick={() =>
               void audio.openEntries(
                 playableTracks(tracks.slice(i)).map(entryFromTrack),

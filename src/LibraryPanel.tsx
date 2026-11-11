@@ -31,7 +31,7 @@ import { entryFromTrack, usePlaylists } from "./playlists";
 import "./Playlists.css";
 import { ArtistArtwork, forgetArtistPhotos } from "./ArtistArtwork";
 import { CollectionDetail } from "./CollectionDetail";
-import { albumGroups } from "./musicViews";
+import { albumGroups, isPlayableTrack } from "./musicViews";
 import type { CollectionRoute, LibraryLocation } from "./navigation";
 
 export function Library({
@@ -276,8 +276,7 @@ export function Library({
   function play(selected: LibraryTrack) {
     const playable = (detailTracks.length ? detailTracks : tracks).filter(
       (t) =>
-        !t.missing &&
-        t.local_path &&
+        isPlayableTrack(t) &&
         (detailTracks.length > 0 ||
           selectedGroup === null ||
           groupIdentity(t, view) === selectedGroup),
@@ -286,10 +285,7 @@ export function Library({
     if (index < 0) return;
     // The selected song begins a queue in the current view's order.
     const ordered = [...playable.slice(index), ...playable.slice(0, index)];
-    void audio.openFiles(
-      ordered.map((t) => t.local_path!),
-      true,
-    );
+    void audio.openEntries(ordered.map(entryFromTrack));
   }
   return (
     <div
@@ -523,9 +519,7 @@ export function Library({
               setSelectedArtistAlbum(null);
             }}
             onPlay={() => {
-              const first = detailTracks.find(
-                (track) => track.local_path && !track.missing,
-              );
+              const first = detailTracks.find(isPlayableTrack);
               if (first) play(first);
             }}
           />
@@ -645,7 +639,7 @@ export function Library({
                     />
                     <button
                       className="library-track-title"
-                      disabled={t.missing || !t.local_path}
+                      disabled={!isPlayableTrack(t)}
                       onClick={() => play(t)}
                       title={t.local_path ?? undefined}
                     >
@@ -656,7 +650,9 @@ export function Library({
                       </span>
                       <small>
                         {!t.local_path
-                          ? "Sin archivo local"
+                          ? isPlayableTrack(t)
+                            ? "Streaming"
+                            : "Sin archivo local"
                           : t.missing
                             ? "Archivo no disponible"
                             : t.format}
@@ -682,11 +678,11 @@ export function Library({
                       <div className="library-actions">
                         <button
                           className="button small"
-                          disabled={t.missing || !t.local_path}
+                          disabled={!isPlayableTrack(t)}
                           onClick={() =>
                             void audio.queueAction({
                               kind: "append",
-                              paths: [t.local_path!],
+                              paths: [entryFromTrack(t).path],
                               after_current: true,
                             })
                           }
@@ -695,11 +691,11 @@ export function Library({
                         </button>
                         <button
                           className="button small"
-                          disabled={t.missing || !t.local_path}
+                          disabled={!isPlayableTrack(t)}
                           onClick={() =>
                             void audio.queueAction({
                               kind: "append",
-                              paths: [t.local_path!],
+                              paths: [entryFromTrack(t).path],
                               after_current: false,
                             })
                           }

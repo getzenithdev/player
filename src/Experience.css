@@ -869,6 +869,24 @@
   border-radius: 50%;
   background: var(--accent);
 }
+.progress-row input {
+  --buffered-audio: var(--muted);
+  background:
+    linear-gradient(
+      90deg,
+      var(--accent) var(--progress, 0%),
+      transparent var(--progress, 0%)
+    ),
+    var(--buffered-ranges, linear-gradient(transparent, transparent)),
+    var(--line);
+}
+.progress-row input::-moz-range-thumb {
+  width: 10px;
+  height: 10px;
+  border: 0;
+  border-radius: 50%;
+  background: var(--accent);
+}
 .player-tools {
   display: flex;
   align-items: center;

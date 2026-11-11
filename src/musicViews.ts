@@ -25,5 +25,20 @@ export function searchMusic(tracks: LibraryTrack[], query: string) {
     : [];
 }
 export function playableTracks(tracks: LibraryTrack[]) {
-  return tracks.filter((t) => t.local_path && !t.missing);
+  return tracks.filter(isPlayableTrack);
+}
+export function isPlayableTrack(track: LibraryTrack) {
+  return (
+    !track.missing &&
+    (!!track.local_path ||
+      (!!track.source_id &&
+        [
+          "youtube",
+          "youtube-auto",
+          "google-drive",
+          "dropbox",
+          "onedrive",
+          "webdav",
+        ].includes(track.source ?? "")))
+  );
 }

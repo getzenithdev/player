@@ -9,6 +9,7 @@ mod library_commands;
 mod lyrics;
 mod metadata;
 mod native;
+mod network_audio;
 mod playlist_commands;
 mod playlists;
 mod resources;

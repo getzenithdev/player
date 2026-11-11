@@ -40,7 +40,7 @@ Phase 6 adds normalized names with original-value preservation, source-neutral t
 
 ## External Sources
 
-Phase 9 adds **Fuentes**, where every provider declares its own capabilities, so the interface only offers search, browsing, playback, download, or revocation when the provider supports it. Local library search works with no network and with the external opt-in disabled. YouTube automático is the primary keyless provider, preparing AAC/M4A audio in cache through local yt-dlp and Node 22 helpers. YouTube API remains a separate metadata-only alternative with existing keys preserved. Google Drive, Dropbox, and OneDrive connect through OAuth 2.0 with PKCE using your own client ID and a loopback redirect; WebDAV needs an HTTPS address with username and password.
+Phase 9 adds **Fuentes**, where every provider declares its own capabilities, so the interface only offers search, browsing, playback, download, or revocation when the provider supports it. Local library search works with no network and with the external opt-in disabled. YouTube automático is the primary keyless provider, resolving AAC/M4A audio for progressive playback through local yt-dlp and Node 22 helpers. External playback uses a bounded native buffer with preloaded audio shown on the seek bar; see [Progressive external audio](docs/streaming.md). YouTube API remains a separate metadata-only alternative with existing keys preserved. Google Drive, Dropbox, and OneDrive connect through OAuth 2.0 with PKCE using your own client ID and a loopback redirect; WebDAV needs an HTTPS address with username and password.
 
 Connections and non-secret settings persist in `config/providers.json`, which the data export never includes, while passwords, API keys, client secrets, and tokens stay in the operating system credential store. Network actions stay off until **Permitir consultas a servicios externos** is enabled. Downloads are stored once in `cache/audio/` and handed to the audio engine, so playback keeps working when a token expires or the network is lost. See [External sources](docs/external-sources.md) for the contract, provider endpoints, limits, tests, and pending manual acceptance.
 
@@ -69,11 +69,11 @@ The npm command above only bootstraps pnpm. All project commands use pnpm 10.33.
 
 Después de la preparación inicial, abre una terminal en la raíz del proyecto y ejecuta el mismo comando en todos los sistemas:
 
-| Sistema | Terminal | Comando para ejecutar la aplicación |
-| --- | --- | --- |
-| Windows 10 / 11 | PowerShell o CMD | `pnpm run tauri dev` |
-| macOS Monterey 12 y posteriores (Intel / Apple Silicon) | Terminal | `pnpm run tauri dev` |
-| Linux | Bash, Zsh u otra terminal | `pnpm run tauri dev` |
+| Sistema                                                 | Terminal                  | Comando para ejecutar la aplicación |
+| ------------------------------------------------------- | ------------------------- | ----------------------------------- |
+| Windows 10 / 11                                         | PowerShell o CMD          | `pnpm run tauri dev`                |
+| macOS Monterey 12 y posteriores (Intel / Apple Silicon) | Terminal                  | `pnpm run tauri dev`                |
+| Linux                                                   | Bash, Zsh u otra terminal | `pnpm run tauri dev`                |
 
 En Monterey usa Node.js 22.12 o posterior de la rama 22. Los requisitos nativos de Rust y Tauri deben estar instalados según tu sistema; consulta [Environment and commands](docs/environment.md). La primera ejecución descarga los componentes de YouTube y necesita conexión a Internet.
 
@@ -123,4 +123,4 @@ External sources / Fuentes: [Phase 9 implementation and provider status](docs/ex
 
 ### YouTube without an API key / YouTube sin API key
 
-YouTube automático is the primary provider, with the existing API retained as a metadata-only alternative. Desktop builds include pinned yt-dlp and Node 22 helpers. Audio is prepared as an AAC/M4A cache file before playback. Setup guides for every provider are inside Fuentes → Proveedores. See [the provider documentation](docs/youtube-provider.md) for packaging, limits, source permissions and the pending actual-Monterey acceptance checks.
+YouTube automático is the primary provider, with the existing API retained as a metadata-only alternative. Desktop builds include pinned yt-dlp and Node 22 helpers. Playback streams a direct AAC/M4A resource through a bounded native buffer; explicit downloads still produce complete cached files. Setup guides for every provider are inside Fuentes → Proveedores. See [the provider documentation](docs/youtube-provider.md) for packaging, limits, source permissions and the pending actual-Monterey acceptance checks.

@@ -4,8 +4,8 @@
 //! connection state, network operations behind an explicit opt-in and
 //! credentials that live in the operating system keyring instead of a JSON
 //! document. Local content keeps working when a provider is unreachable,
-//! expired or disabled, and playback always goes through files the audio
-//! engine already understands.
+//! expired or disabled. Playback resolves an ephemeral network source; only
+//! explicit downloads create complete cached files.
 
 use crate::storage::{StorageManager, indexes::TrackHit};
 mod youtube;
@@ -88,7 +88,7 @@ pub enum ProviderId {
 }
 
 impl ProviderId {
-    fn key(self) -> &'static str {
+    pub(crate) fn key(self) -> &'static str {
         match self {
             Self::Local => "local",
             Self::Youtube => "youtube",
@@ -251,7 +251,7 @@ pub struct Snapshot {
     pub external: bool,
     /// Authorization URL of a connection waiting for the browser.
     pub pending_url: Option<String>,
-    /// Absolute local path of the last download, ready for the audio engine.
+    /// Local download path or stable zenith-source reference (never a signed URL).
     pub downloaded: Option<String>,
     pub warnings: Vec<String>,
 }
@@ -1886,6 +1886,17 @@ fn remember_source_track(
     if provider == ProviderId::Local { return Ok(()); }
     let entry = load(storage)?.cached_results.get(&format!("{provider:?}:{id}")).cloned();
     let Some(entry) = entry else { return Ok(()); };
+    if is_stream_reference(path) {
+        let _lock = storage.library_lock();
+        let mut doc = crate::library::load(storage)?;
+        crate::metadata::upsert(&mut doc, crate::metadata::IncomingTrack {
+            source: provider.key().into(), source_id: Some(id.into()),
+            title: entry.name, artist: entry.artist, album: entry.album,
+            ..Default::default()
+        })?;
+        crate::library::save(storage, &doc)?;
+        return Ok(());
+    }
     crate::library::execute(storage, crate::library::LibraryAction::Import {
         paths: vec![path.to_string()],
     })?;
@@ -2398,6 +2409,74 @@ fn youtube_search(
 
 // --- downloads ---------------------------------------------------------------
 
+pub fn stream_reference(provider: &str, id: &str) -> String {
+    format!("zenith-source:{provider}:{}", percent_encode(id))
+}
+
+pub fn parse_stream_reference(path: &str) -> Option<(ProviderId, String)> {
+    let (provider, encoded) = path.strip_prefix("zenith-source:")?.split_once(':')?;
+    let provider: ProviderId = serde_json::from_value(serde_json::Value::String(provider.into())).ok()?;
+    if provider == ProviderId::Local || encoded.contains(['&', '#', '\r', '\n']) { return None; }
+    let url = reqwest::Url::parse(&format!("https://source.invalid/?id={encoded}")).ok()?;
+    let id = url.query_pairs().find(|(key, _)| key == "id")?.1.into_owned();
+    safe_id(&id).ok()?;
+    Some((provider, id))
+}
+
+pub fn is_stream_reference(path: &str) -> bool { parse_stream_reference(path).is_some() }
+
+/// Resolved on the decoding thread, including after an expired signed URL.
+/// Provider credentials and final media URLs never enter frontend or history.
+pub fn resolve_stream(app: &tauri::AppHandle, path: &str, cancel: &AtomicBool) -> Result<crate::network_audio::RemoteAudio, String> {
+    use tauri::Manager;
+    if cancel.load(Ordering::Acquire) { return Err("Streaming cancelado".into()); }
+    let (provider, id) = parse_stream_reference(path).ok_or("Referencia de streaming inválida")?;
+    let storage = app.state::<StorageManager>();
+    ensure_external(&storage)?;
+    let env = Env {
+        youtube_tools: app.path().resource_dir().map_err(|_| "No se encontraron los componentes de audio")?.join("tools"),
+        ..Env::default()
+    };
+    if matches!(provider, ProviderId::Youtube | ProviderId::YoutubeAuto) {
+        return youtube::resolve_stream(&env.youtube_tools, &id, cancel);
+    }
+    let active = active(&storage, &OsVault, &env, provider)?;
+    let endpoints = env.endpoints(provider);
+    let token = active.secrets.access_token.as_deref().unwrap_or_default();
+    let (url, headers) = match provider {
+        ProviderId::Webdav => (
+            webdav_url(&active.settings.endpoint, &id)?.to_string(),
+            vec![("Authorization".into(), webdav_auth(&active.settings, &active.secrets)?)],
+        ),
+        ProviderId::GoogleDrive => (
+            format!("{}files/{}?alt=media", endpoints.api, percent_encode(&id)),
+            vec![("Authorization".into(), format!("Bearer {token}"))],
+        ),
+        ProviderId::Dropbox => {
+            let body = serde_json::json!({"path": id}).to_string();
+            let metadata = send("POST", &format!("{base}files/get_temporary_link", base = endpoints.api),
+                &[("Authorization", format!("Bearer {token}")), ("Content-Type", "application/json".into())],
+                Some(body.as_bytes()), MAX_JSON)?;
+            if !metadata.ok() { return Err(format!("Dropbox respondió {}", metadata.status)); }
+            let url = metadata.json()?.get("link").and_then(|v| v.as_str()).ok_or("Dropbox no ofreció un enlace de audio")?.to_string();
+            (url, Vec::new())
+        }
+        ProviderId::OneDrive => {
+            let metadata = send("GET", &format!("{}me/drive/items/{}?$select=@microsoft.graph.downloadUrl", endpoints.api, percent_encode(&id)),
+                &token_header(token), None, MAX_JSON)?;
+            if !metadata.ok() { return Err(format!("OneDrive respondió {}", metadata.status)); }
+            let url = metadata.json()?.get("@microsoft.graph.downloadUrl").and_then(|v| v.as_str()).ok_or("OneDrive no ofreció un enlace de audio")?.to_string();
+            (url, Vec::new())
+        }
+        _ => return Err("Proveedor no admitido para streaming".into()),
+    };
+    secure_url(&url)?;
+    let entry = load(&storage)?.cached_results.get(&format!("{provider:?}:{id}")).cloned();
+    let hint = entry.as_ref().and_then(|e| Path::new(&e.name).extension()).and_then(|ext| ext.to_str())
+        .or_else(|| Path::new(&id).extension().and_then(|ext| ext.to_str())).map(str::to_lowercase);
+    Ok(crate::network_audio::RemoteAudio { url, headers, hint })
+}
+
 /// Remove presentation labels, preserving musical versions such as live/remix.
 fn youtube_title(title: &str) -> String {
     let mut cleaned = title.trim();
@@ -2881,12 +2960,12 @@ fn execute_with(
             if provider != ProviderId::Local {
                 ensure_external(storage)?;
             }
-            let playback_provider = if provider == ProviderId::Youtube {
-                ProviderId::YoutubeAuto
+            downloaded = Some(if provider == ProviderId::Local {
+                local_download(storage, &id)?
             } else {
-                provider
-            };
-            downloaded = Some(download(storage, store, env, playback_provider, &id)?);
+                safe_id(&id)?;
+                stream_reference(provider.key(), &id)
+            });
             if let Some(path) = &downloaded {
                 remember_source_track(storage, provider, &id, path)?;
             }
@@ -2952,7 +3031,8 @@ pub async fn sources_action(app: tauri::AppHandle, action: Action) -> Result<Sna
             let track = {
                 let _lock = storage.library_lock();
                 crate::library::load(&storage)?.tracks.into_iter()
-                    .find(|track| track.local_path.as_ref() == Some(path))
+                    .find(|track| track.local_path.as_ref() == Some(path)
+                        || (is_stream_reference(path) && track.source.as_deref() == Some(provider.key()) && track.source_id.as_deref() == Some(id.as_str())))
             };
             if let Some(track) = track {
                 let app = app.clone();
